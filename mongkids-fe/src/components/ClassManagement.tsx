@@ -320,16 +320,21 @@ export default function ClassManagement() {
                                                  {student.grade}
                                                </Badge>
                                                <div 
-                                                 className={`w-3 h-3 rounded-full ${getLevelColor(student.level).replace('bg-', 'bg-').replace('text-', '')}`}
                                                  style={{
                                                    backgroundColor: 
-                                                     student.level === 'RED' ? '#ef4444' :
-                                                     student.level === 'WHITE' ? '#9ca3af' :
-                                                     student.level === 'YELLOW' ? '#eab308' :
-                                                     student.level === 'GREEN' ? '#22c55e' :
-                                                     student.level === 'BLUE' ? '#3b82f6' :
-                                                     student.level === 'BLACK' ? '#000000' :
-                                                     student.level === 'ADVANCED' ? '#a855f7' : '#9ca3af'
+                                                     student.level === 'NONE' ? '#e5e7eb' :
+                                                     student.level === 'WHITE' ? '#ffffff' :
+                                                     student.level === 'YELLOW' ? '#fde047' :
+                                                     student.level === 'GREEN' ? '#86efac' :
+                                                     student.level === 'BLUE' ? '#93c5fd' :
+                                                     student.level === 'RED' ? '#fca5a5' :
+                                                     student.level === 'BLACK' ? '#374151' :
+                                                     student.level === 'GOLD' ? '#fbbf24' : '#e5e7eb',
+                                                   border: student.level === 'WHITE' ? '1px solid #d1d5db' : 'none',
+                                                   width: '12px',
+                                                   height: '12px',
+                                                   borderRadius: '2px',
+                                                   display: 'inline-block'
                                                  }}
                                                />
                                              </div>
