@@ -1,9 +1,11 @@
-import { useState } from "react"
+import React, { useState } from "react"
 import { Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from "./components/ui/sidebar"
-import { Home, BookOpen, Users } from "lucide-react"
+import { Home, BookOpen, Users, CreditCard, UserPlus } from "lucide-react"
 import MainDashboard from "./components/MainDashboard"
 import ClassManagement from "./components/ClassManagement"
 import StudentManagement from "./components/StudentManagement"
+import PaymentManagement from "./components/PaymentManagement"
+import TrialManagement from "./components/TrialManagement"
 
 const menuItems = [
   {
@@ -20,6 +22,16 @@ const menuItems = [
     title: "학생 관리",
     icon: Users,
     id: "students"
+  },
+  {
+    title: "결제 관리",
+    icon: CreditCard,
+    id: "payment"
+  },
+  {
+    title: "체험 관리",
+    icon: UserPlus,
+    id: "trial"
   }
 ]
 
@@ -34,6 +46,10 @@ export default function App() {
         return <ClassManagement />
       case "students":
         return <StudentManagement />
+      case "payment":
+        return <PaymentManagement />
+      case "trial":
+        return <TrialManagement />
       default:
         return <MainDashboard />
     }
@@ -45,7 +61,7 @@ export default function App() {
         <Sidebar>
           <SidebarHeader>
             <div className="px-4 py-2">
-              <h2>학원 관리 시스템</h2>
+              <h2>몽키즈클라이밍 고양화정점</h2>
             </div>
           </SidebarHeader>
           <SidebarContent>
