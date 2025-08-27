@@ -1,6 +1,6 @@
 
   {
-      "name": "학원 관리 어드민 웹페이지",
+      "name": "mongkids-fe",
       "version": "0.1.0",
       "private": true,
       "dependencies": {
