@@ -11,8 +11,8 @@ const allStudents = [
     birthDate: "2015-03-15",
     phone: "010-1234-5678",
     courseInfo: "주 2회 키즈",
-    level: "초급",
-    memo: "집중력이 좋음"
+    level: "RED",
+    memo: ""
   },
   {
     id: 2,
@@ -20,8 +20,8 @@ const allStudents = [
     birthDate: "2014-07-22",
     phone: "010-2345-6789",
     courseInfo: "주 1회 키즈",
-    level: "초급",
-    memo: "활발한 성격"
+    level: "WHITE",
+    memo: ""
   },
   {
     id: 3,
@@ -29,8 +29,8 @@ const allStudents = [
     birthDate: "2008-11-03",
     phone: "010-3456-7890",
     courseInfo: "주 3회 청소년",
-    level: "중급",
-    memo: "무용에 재능이 있음"
+    level: "BLACK",
+    memo: ""
   },
   {
     id: 4,
@@ -38,7 +38,7 @@ const allStudents = [
     birthDate: "2009-05-18",
     phone: "010-4567-8901",
     courseInfo: "주 2회 청소년",
-    level: "중급",
+    level: "YELLOW",
     memo: ""
   },
   {
@@ -47,8 +47,17 @@ const allStudents = [
     birthDate: "2006-09-12",
     phone: "010-5678-9012",
     courseInfo: "주 1회 스페셜",
-    level: "고급",
+    level: "BLUE",
     memo: "경험이 많음"
+  },
+  {
+    id: 6,
+    name: "김도현",
+    birthDate: "2006-09-12",
+    phone: "010-5678-9012",
+    courseInfo: "주 1회 스페셜",
+    level: "GREEN",
+    memo: ""
   }
 ]
 
@@ -86,7 +95,7 @@ export default function StudentManagement() {
                   <TableHead>생년월일</TableHead>
                   <TableHead>전화번호</TableHead>
                   <TableHead>수강정보</TableHead>
-                  <TableHead>수준</TableHead>
+                  <TableHead>레벨</TableHead>
                   <TableHead>메모</TableHead>
                 </TableRow>
               </TableHeader>
