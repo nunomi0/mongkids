@@ -125,6 +125,15 @@ export default function ClassManagement() {
   } | null>(null)
   const [selectedStudents, setSelectedStudents] = useState<number[]>([])
   const [attendance, setAttendance] = useState<{[key: string]: {[studentId: number]: boolean}}>({})
+  // 학생별 출석 상태 (yyyy-MM-dd => 상태)
+  const [attendanceStatus, setAttendanceStatus] = useState<Record<number, Record<string, 'present' | 'absent' | 'makeup' | 'makeup_done'>>>({})
+  // Deprecated: 학생별 출석 기록 (present 전용) - 기존 호환 제거
+  const [attendanceRecords, setAttendanceRecords] = useState<Record<number, string[]>>({})
+  // 깃허브 잔디형 월간 4칸 출결 상태 (present/absent/makeup/none)
+  const [attendanceGrid, setAttendanceGrid] = useState<Record<number, Record<string, ("present"|"absent"|"makeup"|"none")[]>>>({})
+  // 보강 예약용 (행 단위 팝오버 제어가 필요 없어서 인라인으로 처리)
+  // 캘린더 하이라이트(호버)용 상태
+  const [hoveredCalendarDates, setHoveredCalendarDates] = useState<{present: Date[]; absent: Date[]; makeup: Date[]; makeup_done: Date[]}>({ present: [], absent: [], makeup: [], makeup_done: [] })
 
   // 현재 시간 업데이트
   useEffect(() => {
@@ -288,6 +297,140 @@ export default function ClassManagement() {
   const timeOptions = getTimeOptions()
   const allTimeSlots = getAllTimeSlots()
 
+  // yyyy-MM-dd 포맷 키
+  const getDateKey = (date: Date) => {
+    const y = date.getFullYear()
+    const m = `${date.getMonth() + 1}`.padStart(2, '0')
+    const d = `${date.getDate()}`.padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+
+  // 특정 날짜 출석 상태
+  const getStatusOnDate = (studentId: number, date: Date) => {
+    const key = getDateKey(date)
+    return attendanceStatus[studentId]?.[key] || 'none'
+  }
+  const isAttendedOnDate = (studentId: number, date: Date) => getStatusOnDate(studentId, date) === 'present'
+
+  // 출석 토글 (일별 수업에서 선택된 날짜 기준)
+  const toggleAttendanceForSelectedDate = (studentId: number) => {
+    const key = getDateKey(selectedDate)
+    setAttendanceStatus(prev => {
+      const mapForStudent = { ...(prev[studentId] || {}) }
+      const current = mapForStudent[key] || 'none'
+      const next = current === 'none' ? 'present' : current === 'present' ? 'absent' : current === 'absent' ? 'makeup' : current === 'makeup' ? 'makeup_done' : 'present'
+      mapForStudent[key] = next
+      return { ...prev, [studentId]: mapForStudent }
+    })
+  }
+
+  // 이번 달 출석 합계
+  const getMonthlyAttendanceCount = (studentId: number, baseDate: Date) => {
+    const y = baseDate.getFullYear()
+    const m = baseDate.getMonth() + 1
+    const prefix = `${y}-${`${m}`.padStart(2, '0')}-`
+    const map = attendanceStatus[studentId] || {}
+    return Object.entries(map).filter(([dateKey, status]) => dateKey.startsWith(prefix) && status === 'present').length
+  }
+
+  // 월 키와 주 인덱스(0~3)
+  const getMonthKey = (date: Date) => `${date.getFullYear()}-${`${date.getMonth()+1}`.padStart(2,'0')}`
+  const getWeekIndexInMonth = (date: Date) => {
+    const firstOfMonth = startOfMonth(date)
+    const firstWeekStart = startOfWeek(firstOfMonth, { weekStartsOn: 1 })
+    const currentWeekStart = startOfWeek(date, { weekStartsOn: 1 })
+    const diffMs = currentWeekStart.getTime() - firstWeekStart.getTime()
+    const idx = Math.floor(diffMs / (7*24*60*60*1000))
+    return Math.max(0, Math.min(3, idx))
+  }
+
+  // 특정 월 기준 주차 인덱스의 주 시작/끝
+  const getWeekRangeByIndex = (baseDate: Date, index: number) => {
+    const firstOfMonth = startOfMonth(baseDate)
+    const firstWeekStart = startOfWeek(firstOfMonth, { weekStartsOn: 1 })
+    const start = new Date(firstWeekStart.getTime() + index * 7 * 24 * 60 * 60 * 1000)
+    const end = new Date(start.getTime() + 6 * 24 * 60 * 60 * 1000)
+    return { start, end }
+  }
+
+  // 잔디 셀 호버용: 주차별 상태별 날짜 리스트 반환 (해당 월에 속하는 날짜만)
+  const getAttendanceDatesForCellByStatus = (studentId: number, baseDate: Date, index: number) => {
+    const { start, end } = getWeekRangeByIndex(baseDate, index)
+    const month = baseDate.getMonth()
+    const map = attendanceStatus[studentId] || {}
+    const collate = (target: 'present' | 'makeup' | 'makeup_done') => Object.entries(map)
+      .filter(([k, status]) => status === target)
+      .map(([k]) => {
+        const [y,m,d] = k.split('-').map(n => parseInt(n, 10))
+        return new Date(y, m-1, d)
+      })
+      .filter(dt => dt >= start && dt <= end && dt.getMonth() === month)
+      .map(dt => `${dt.getMonth()+1}/${dt.getDate()}`)
+      .sort((a,b) => {
+        const [am,ad] = a.split('/').map(n=>parseInt(n,10))
+        const [bm,bd] = b.split('/').map(n=>parseInt(n,10))
+        if (am !== bm) return am - bm
+        return ad - bd
+      })
+    return {
+      present: collate('present'),
+      absent: Object.entries(map)
+        .filter(([k, status]) => status === 'absent')
+        .map(([k]) => {
+          const [y,m,d] = k.split('-').map(n => parseInt(n, 10))
+          return new Date(y, m-1, d)
+        })
+        .filter(dt => dt >= start && dt <= end && dt.getMonth() === month)
+        .map(dt => `${dt.getMonth()+1}/${dt.getDate()}`)
+        .sort((a,b) => {
+          const [am,ad] = a.split('/').map(n=>parseInt(n,10))
+          const [bm,bd] = b.split('/').map(n=>parseInt(n,10))
+          if (am !== bm) return am - bm
+          return ad - bd
+        }),
+      makeup: collate('makeup'),
+      makeup_done: collate('makeup_done')
+    }
+  }
+
+  // 문자열 M/D 배열을 Date 배열로 변환 (연/월은 baseDate 기준)
+  const toDateObjectsFromMonthDay = (baseDate: Date, monthDayList: string[]) => {
+    const year = baseDate.getFullYear()
+    return monthDayList.map(md => {
+      const [m, d] = md.split('/').map(n => parseInt(n, 10))
+      return new Date(year, m - 1, d)
+    })
+  }
+
+  const isSameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+
+
+  // 월간 4칸 상태 가져오기/설정
+  const getWeeklyCells = (studentId: number, date: Date) => {
+    const monthKey = getMonthKey(date)
+    const existing = attendanceGrid[studentId]?.[monthKey]
+    if (existing) return existing
+    return ["none","none","none","none"] as ("present"|"absent"|"makeup"|"none")[]
+  }
+
+  const setWeeklyCell = (studentId: number, date: Date, index: number, value: "present"|"absent"|"makeup"|"none") => {
+    const monthKey = getMonthKey(date)
+    setAttendanceGrid(prev => {
+      const studentMap = { ...(prev[studentId] || {}) }
+      const cells = [...(studentMap[monthKey] || ["none","none","none","none"] as const)] as ("present"|"absent"|"makeup"|"none")[]
+      cells[index] = value
+      return { ...prev, [studentId]: { ...studentMap, [monthKey]: cells } }
+    })
+  }
+
+  // 셀 클릭 시 상태 순환
+  const cycleWeeklyCell = (studentId: number, date: Date, index: number) => {
+    const cells = getWeeklyCells(studentId, date)
+    const current = cells[index]
+    const next = current === "none" ? "present" : current === "present" ? "absent" : current === "absent" ? "makeup" : "none"
+    setWeeklyCell(studentId, date, index, next)
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -319,6 +462,15 @@ export default function ClassManagement() {
                   <Calendar
                     mode="single"
                     selected={selectedDate}
+                    modifiers={{
+                      ...(typeof selectedWeek !== 'undefined' ? {
+                        selected: (date) => date >= selectedWeek.start && date <= selectedWeek.end,
+                      } : {}),
+                      present: (date) => hoveredCalendarDates.present.some(d => isSameDay(d, date)),
+                      absent: (date) => hoveredCalendarDates.absent.some(d => isSameDay(d, date)),
+                      makeup: (date) => hoveredCalendarDates.makeup.some(d => isSameDay(d, date)),
+                      makeup_done: (date) => hoveredCalendarDates.makeup_done.some(d => isSameDay(d, date)),
+                    }}
                     onSelect={(date) => {
                       if (date) {
                         // 선택된 날짜의 요일로 자동 설정
@@ -330,29 +482,34 @@ export default function ClassManagement() {
                         // 해당 주차 하이라이팅을 위한 주차 범위 설정
                         const weekRange = getWeekRange(date)
                         setSelectedWeek(weekRange)
+                        setHoveredCalendarDates({ present: [], absent: [], makeup: [], makeup_done: [] })
                       }
                     }}
                     numberOfMonths={1}
                     defaultMonth={selectedDate}
                     weekStartsOn={1}
                     className="rounded-md border"
-                    modifiers={{
-                      // 선택된 주차만 하이라이트
-                      selected: (date) => {
-                        return date >= selectedWeek.start && date <= selectedWeek.end
-                      },
-                      // 호버 효과 - 마우스가 올라간 날짜의 주차만 하이라이트
-                      hover: (date) => {
-                        const hoverWeekStart = startOfWeek(date, { weekStartsOn: 1 })
-                        const hoverWeekEnd = endOfWeek(date, { weekStartsOn: 1 })
-                        return date >= hoverWeekStart && date <= hoverWeekEnd
-                      }
-                    }}
                     modifiersStyles={{
                       selected: {
                         backgroundColor: 'hsl(var(--primary))',
                         color: 'hsl(var(--primary-foreground))',
                         fontWeight: 'bold'
+                      },
+                      present: {
+                        backgroundColor: '#22c55e',
+                        color: 'white'
+                      },
+                      absent: {
+                        backgroundColor: '#ef4444',
+                        color: 'white'
+                      },
+                      makeup: {
+                        backgroundColor: '#eab308',
+                        color: '#111827'
+                      },
+                      makeup_done: {
+                        backgroundColor: '#38bdf8',
+                        color: '#0b1324'
                       },
                       hover: {
                         backgroundColor: 'hsl(var(--accent))',
@@ -408,28 +565,108 @@ export default function ClassManagement() {
                       </CardHeader>
                       <CardContent>
                         <div>
-                          <p className="mb-2">참여 학생 ({classItem.students.length}명):</p>
-                          <div className="space-y-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="font-medium">참여 학생 ({classItem.students.length}명)</p>
+                            <span className="text-xs text-muted-foreground">{format(selectedDate, 'yyyy.MM.dd')} 기준</span>
+                          </div>
+                          <div className="space-y-3">
                             {classItem.students
                               .filter((student): student is NonNullable<typeof student> => student !== undefined)
                               .map((student) => (
                                 <div key={student.id} className="flex items-center justify-between p-2 rounded border">
-                                  <span>{student.name}</span>
-                                  <div className="flex gap-2 items-center">
+                                  <div className="flex items-center gap-3">
+                                    <Button
+                                      variant={(() => {
+                                        const s = getStatusOnDate(student.id, selectedDate)
+                                        if (s === 'present') return 'default'
+                                        if (s === 'absent') return 'destructive'
+                                        if (s === 'makeup') return 'secondary'
+                                        if (s === 'makeup_done') return 'secondary'
+                                        return 'outline'
+                                      })()}
+                                      size="sm"
+                                      onClick={() => toggleAttendanceForSelectedDate(student.id)}
+                                      className="h-7 px-3"
+                                      style={(() => {
+                                        const s = getStatusOnDate(student.id, selectedDate)
+                                        if (s === 'makeup') return { backgroundColor: '#eab308', color: '#111827', borderColor: '#d1d5db' }
+                                        if (s === 'makeup_done') return { backgroundColor: '#38bdf8', color: '#0b1324', borderColor: '#38bdf8' }
+                                        return {}
+                                      })()}
+                                    >
+                                      {(() => {
+                                        const s = getStatusOnDate(student.id, selectedDate)
+                                        if (s === 'present') return '출석'
+                                        if (s === 'absent') return '결석'
+                                        if (s === 'makeup') return '보강예정'
+                                        if (s === 'makeup_done') return '보강완료'
+                                        return '출석'
+                                      })()}
+                                    </Button>
+                                    <span className="font-medium">{student.name}</span>
                                     <Badge variant="outline">{student.grade}</Badge>
                                     <div 
-                                      className="w-3 h-3 rounded-full"
                                       style={{
                                         backgroundColor: 
-                                          student.level === 'RED' ? '#ef4444' :
-                                          student.level === 'WHITE' ? '#9ca3af' :
-                                          student.level === 'YELLOW' ? '#eab308' :
-                                          student.level === 'GREEN' ? '#22c55e' :
-                                          student.level === 'BLUE' ? '#3b82f6' :
-                                          student.level === 'BLACK' ? '#000000' :
-                                          student.level === 'ADVANCED' ? '#a855f7' : '#9ca3af'
+                                          student.level === 'NONE' ? '#e5e7eb' :
+                                          student.level === 'WHITE' ? '#ffffff' :
+                                          student.level === 'YELLOW' ? '#fde047' :
+                                          student.level === 'GREEN' ? '#86efac' :
+                                          student.level === 'BLUE' ? '#93c5fd' :
+                                          student.level === 'RED' ? '#fca5a5' :
+                                          student.level === 'BLACK' ? '#374151' :
+                                          student.level === 'GOLD' ? '#fbbf24' : '#e5e7eb',
+                                        border: student.level === 'WHITE' ? '1px solid #d1d5db' : 'none',
+                                        width: '12px',
+                                        height: '12px',
+                                        borderRadius: '2px',
+                                        display: 'inline-block'
                                       }}
                                     />
+                                  </div>
+                                  <div className="flex flex-col items-end gap-2">
+                                    <div className="flex gap-1">
+                                      {([0,1,2,3] as const).map((idx) => (
+                                        <button
+                                          key={idx}
+                                          className="h-4 w-4 rounded-sm border"
+                                          style={{
+                                            backgroundColor: (() => {
+                                              const state = getWeeklyCells(student.id, selectedDate)[idx]
+                                              if (state === 'present') return '#22c55e' // 초록
+                                              if (state === 'absent') return '#ef4444' // 빨강
+                                              if (state === 'makeup') return '#eab308' // 노랑
+                                              if (state === 'makeup_done') return '#38bdf8' // 하늘색
+                                              return '#e5e7eb' // 회색
+                                            })(),
+                                            borderColor: '#d1d5db'
+                                          }}
+                                          onMouseEnter={() => {
+                                            const { present, absent, makeup, makeup_done } = getAttendanceDatesForCellByStatus(student.id, selectedDate, idx)
+                                            setHoveredCalendarDates({
+                                              present: toDateObjectsFromMonthDay(selectedDate, present),
+                                              absent: toDateObjectsFromMonthDay(selectedDate, absent),
+                                              makeup: toDateObjectsFromMonthDay(selectedDate, makeup),
+                                              makeup_done: toDateObjectsFromMonthDay(selectedDate, makeup_done),
+                                            })
+                                          }}
+                                          onMouseLeave={() => setHoveredCalendarDates({ present: [], absent: [], makeup: [], makeup_done: [] })}
+                                          title={(() => {
+                                            const { present, absent, makeup, makeup_done } = getAttendanceDatesForCellByStatus(student.id, selectedDate, idx)
+                                            const parts = [] as string[]
+                                            if (present.length) parts.push(`출석: ${present.join(', ')}`)
+                                            if (absent.length) parts.push(`결석: ${absent.join(', ')}`)
+                                            if (makeup.length) parts.push(`보강예정: ${makeup.join(', ')}`)
+                                            if (makeup_done.length) parts.push(`보강완료: ${makeup_done.join(', ')}`)
+                                            return parts.length ? parts.join(' | ') : '기록 없음'
+                                          })()}
+                                          aria-label={`week-${idx+1}`}
+                                        />
+                                      ))}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <div className="text-[10px] text-muted-foreground">이번 달 출석 {getMonthlyAttendanceCount(student.id, selectedDate)}회</div>
+                                    </div>
                                   </div>
                                 </div>
                               ))}
