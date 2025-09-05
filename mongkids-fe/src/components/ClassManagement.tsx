@@ -969,7 +969,7 @@ export default function ClassManagement() {
 
       {/* 수업 학생 관리 다이얼로그 */}
       <Dialog open={isManageOpen} onOpenChange={setIsManageOpen}>
-        <DialogContent className="sm:max-w-4xl p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden">
           <div className="max-h-[90vh] flex flex-col min-h-0">
 
           <DialogHeader className="flex-shrink-0">
@@ -995,7 +995,7 @@ export default function ClassManagement() {
               </div>
 
               {/* 학생 리스트 */}
-              <div className="flex-1 overflow-y-auto">
+              <div className="h-10">
                 <div className="space-y-4">
                   {/* 현재 등록된 학생 */}
                   <div>
