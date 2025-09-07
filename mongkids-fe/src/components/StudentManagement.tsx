@@ -3,12 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Input } from "./ui/input"
-import { Search, Edit, Trash2, Users, UserX, Clock } from "lucide-react"
+import { Search, Edit, Trash2, Users, UserX, Clock, Plus } from "lucide-react"
 import { Button } from "./ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog"
 import { supabase } from "../lib/supabase"
 // 로컬 타입 정의 (supabase.ts의 api 의존 제거)
-type StudentStatus = '재원' | '휴원' | '퇴원'
 type LevelType = 'WHITE' | 'YELLOW' | 'GREEN' | 'BLUE' | 'RED' | 'BLACK' | 'GOLD' | null
 type Student = {
   id: number
@@ -33,7 +32,7 @@ type StudentStatus = '재원' | '퇴원' | '휴원'
 
 export default function StudentManagement() {
   const [searchTerm, setSearchTerm] = useState("")
-  const [allStudents, setAllStudents] = useState<(Student & { last_payment_date: string | null; schedules: StudentSchedule[] })[]>([])
+  const [allStudents, setAllStudents] = useState<(Student & { last_payment_date: string | null; last_payment_amount: number | null; schedules: StudentSchedule[] })[]>([])
   const [classTypes, setClassTypes] = useState<ClassType[]>([])
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
@@ -42,12 +41,26 @@ export default function StudentManagement() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<'all' | '재원' | '퇴원' | '휴원'>('재원')
+  const [monthFilter, setMonthFilter] = useState<string>('all')
+  const [availableMonths, setAvailableMonths] = useState<Array<{value: string, label: string}>>([])
+  const [allPayments, setAllPayments] = useState<Array<{student_id: number, payment_date: string, total_amount: number}>>([])
   const [deleteConfirmName, setDeleteConfirmName] = useState("")
   const [studentLevels, setStudentLevels] = useState<StudentLevel[]>([])
   const [isLevelEditOpen, setIsLevelEditOpen] = useState(false)
   const [levelEditData, setLevelEditData] = useState<{
     [key: string]: string
   }>({})
+  const [isPaymentAddOpen, setIsPaymentAddOpen] = useState(false)
+  const [newPayment, setNewPayment] = useState({
+    payment_date: new Date().toISOString().slice(0, 10),
+    payment_month: new Date().toISOString().slice(0, 7) + '-01', // 월의 첫째 날
+    total_amount: '',
+    shoe_discount: '0',
+    sibling_discount: '0',
+    additional_discount: '0',
+    payment_method: 'bank_transfer',
+    status: 'paid'
+  })
   
   // 결제 및 출석 정보 상태
   const [studentPayments, setStudentPayments] = useState<Payment[]>([])
@@ -85,7 +98,7 @@ export default function StudentManagement() {
     status: "재원" as StudentStatus
   })
 
-  // 학생 목록 로드
+  // 학생 목록 로드 (결제 정보 포함)
   const loadStudents = async () => {
     try {
       setLoading(true)
@@ -96,7 +109,7 @@ export default function StudentManagement() {
           .select('*')
           .order('created_at', { ascending: false })
         if (error) throw error
-        return (data || []).map((s: any) => ({ ...s, last_payment_date: null }))
+        return (data || []).map((s: any) => ({ ...s, last_payment_date: null, last_payment_amount: null }))
       })()
 
       const classTypesData = await (async () => {
@@ -108,7 +121,7 @@ export default function StudentManagement() {
         return data || []
       })()
       
-      // 각 학생의 스케줄 정보 가져오기
+      // 각 학생의 스케줄 정보와 최근 결제 정보 가져오기
       const studentsWithSchedules = await Promise.all(
         studentsData.map(async (student) => {
           const { data: schData, error: schErr } = await supabase
@@ -118,15 +131,56 @@ export default function StudentManagement() {
             .order('created_at', { ascending: true })
           if (schErr) throw schErr
           const schedules = (schData as StudentSchedule[]) || []
+          
+          // 최근 결제 정보 가져오기
+          const { data: paymentData, error: paymentErr } = await supabase
+            .from('payments')
+            .select('payment_date, total_amount')
+            .eq('student_id', student.id)
+            .order('payment_date', { ascending: false })
+            .limit(1)
+          
+          const lastPayment = paymentData && paymentData.length > 0 ? paymentData[0] : null
+          
           return {
             ...student,
-            schedules
+            schedules,
+            last_payment_date: lastPayment?.payment_date || null,
+            last_payment_amount: lastPayment?.total_amount || null
           }
         })
       )
       
       setAllStudents(studentsWithSchedules)
       setClassTypes(classTypesData)
+      
+      // 모든 결제 내역 로드
+      const { data: paymentsData, error: paymentsError } = await supabase
+        .from('payments')
+        .select('student_id, payment_date, payment_month, total_amount, status')
+        .order('payment_date', { ascending: false })
+      
+      if (paymentsError) {
+        console.error('Error loading payments:', paymentsError)
+        setAllPayments([])
+      } else {
+        setAllPayments(paymentsData || [])
+      }
+      
+      // 최근 12개월
+      const currentDate = new Date()
+      const monthOptions = [
+        { value: 'all', label: '전체' }
+      ]
+      
+      for (let i = 0; i < 12; i++) {
+        const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1)
+        const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        const label = `${date.getFullYear()}년 ${date.getMonth() + 1}월`
+        monthOptions.push({ value: yearMonth, label })
+      }
+      
+      setAvailableMonths(monthOptions)
     } catch (error) {
       console.error('Error loading students:', error)
     } finally {
@@ -200,6 +254,12 @@ export default function StudentManagement() {
     return status !== '퇴원'
   }
 
+  const getClassTypeName = (classTypeId: number | null) => {
+    if (!classTypeId) return "-"
+    const classType = classTypes.find(ct => ct.id === classTypeId)
+    return classType ? `${classType.category} 주 ${classType.sessions_per_week}회` : "-"
+  }
+
   // 필터링된 학생 목록
   const filteredStudents = useMemo(() => {
     let filtered = allStudents
@@ -214,15 +274,56 @@ export default function StudentManagement() {
     }
     // 'all'인 경우 모든 학생 포함
 
+    // 월별 필터 적용 (재원 학생만)
+    if (monthFilter !== 'all') {
+      filtered = filtered.filter(student => {
+        if (student.status !== '재원') return false
+        
+        // 재원 학생은 모두 포함 (결제/미결제 관계없이)
+        return true
+      })
+    }
+
     // 검색어 필터 적용
     if (searchTerm) {
       filtered = filtered.filter(student =>
-        student.name.toLowerCase().includes(searchTerm.toLowerCase())
+        student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        student.phone.includes(searchTerm) ||
+        getClassTypeName(student.class_type_id).toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
+    // 월별 필터가 적용된 경우 결제/미결제 정렬
+    if (monthFilter !== 'all' && statusFilter === '재원') {
+      filtered.sort((a, b) => {
+        // 해당 월에 결제한 학생이 있는지 확인 (payment_month 기준)
+        const aHasPayment = allPayments.some(payment => {
+          if (payment.student_id !== a.id) return false
+          if (!payment.payment_month) return false
+          const paymentMonth = new Date(payment.payment_month)
+          const paymentYearMonth = `${paymentMonth.getFullYear()}-${String(paymentMonth.getMonth() + 1).padStart(2, '0')}`
+          return paymentYearMonth === monthFilter && payment.status === 'paid'
+        })
+        
+        const bHasPayment = allPayments.some(payment => {
+          if (payment.student_id !== b.id) return false
+          if (!payment.payment_month) return false
+          const paymentMonth = new Date(payment.payment_month)
+          const paymentYearMonth = `${paymentMonth.getFullYear()}-${String(paymentMonth.getMonth() + 1).padStart(2, '0')}`
+          return paymentYearMonth === monthFilter && payment.status === 'paid'
+        })
+        
+        // 결제한 학생을 먼저, 미결제 학생을 나중에
+        if (aHasPayment && !bHasPayment) return -1
+        if (!aHasPayment && bHasPayment) return 1
+        
+        // 둘 다 결제했거나 둘 다 미결제인 경우 이름순 정렬
+        return a.name.localeCompare(b.name)
+      })
+    }
+
     return filtered
-  }, [allStudents, statusFilter, searchTerm])
+  }, [allStudents, statusFilter, monthFilter, searchTerm, allPayments])
 
   const getLevelColor = (level: string) => {
     switch (level) {
@@ -613,11 +714,96 @@ export default function StudentManagement() {
     }
   }
 
-  const getClassTypeName = (classTypeId: number | null) => {
-    if (!classTypeId) return "-"
-    const classType = classTypes.find(ct => ct.id === classTypeId)
-    return classType ? `${classType.category} 주 ${classType.sessions_per_week}회` : "-"
+  const getLastPaymentData = () => {
+    if (!selectedStudent || studentPayments.length === 0) {
+      return {
+        total_amount: '',
+        shoe_discount: '0',
+        sibling_discount: '0',
+        additional_discount: '0',
+        payment_method: 'bank_transfer'
+      }
+    }
+
+    // 가장 최근 결제 내역에서 데이터 가져오기
+    const lastPayment = studentPayments[0]
+    
+    // 실제 결제금액 + 할인금액들을 합쳐서 원본 금액 추정
+    const estimatedOriginalAmount = lastPayment.total_amount + 
+      (lastPayment.shoe_discount || 0) + 
+      (lastPayment.sibling_discount || 0) + 
+      (lastPayment.additional_discount || 0)
+
+    return {
+      total_amount: estimatedOriginalAmount > 0 ? estimatedOriginalAmount.toString() : '',
+      shoe_discount: (lastPayment.shoe_discount || 0).toString(),
+      sibling_discount: (lastPayment.sibling_discount || 0).toString(),
+      additional_discount: (lastPayment.additional_discount || 0).toString(),
+      payment_method: lastPayment.payment_method || 'bank_transfer'
+    }
   }
+
+  const openPaymentAddDialog = () => {
+    const lastPaymentData = getLastPaymentData()
+    setNewPayment({
+      payment_date: new Date().toISOString().slice(0, 10),
+      payment_month: new Date().toISOString().slice(0, 7) + '-01',
+      total_amount: lastPaymentData.total_amount,
+      shoe_discount: lastPaymentData.shoe_discount,
+      sibling_discount: lastPaymentData.sibling_discount,
+      additional_discount: lastPaymentData.additional_discount,
+      payment_method: lastPaymentData.payment_method,
+      status: 'paid'
+    })
+    setIsPaymentAddOpen(true)
+  }
+
+  const addPayment = async () => {
+    if (!selectedStudent || !newPayment.payment_date || !newPayment.total_amount || !newPayment.payment_month) return
+
+    try {
+      const totalAmount = parseInt(newPayment.total_amount)
+      const shoeDiscount = parseInt(newPayment.shoe_discount) || 0
+      const siblingDiscount = parseInt(newPayment.sibling_discount) || 0
+      const additionalDiscount = parseInt(newPayment.additional_discount) || 0
+      const netAmount = totalAmount - shoeDiscount - siblingDiscount - additionalDiscount
+
+      const { error } = await supabase
+        .from('payments')
+        .insert({
+          student_id: selectedStudent.id,
+          payment_date: newPayment.payment_date,
+          payment_month: newPayment.payment_month,
+          total_amount: netAmount,
+          shoe_discount: shoeDiscount,
+          sibling_discount: siblingDiscount,
+          additional_discount: additionalDiscount,
+          payment_method: newPayment.payment_method,
+          status: newPayment.status
+        })
+
+      if (error) throw error
+
+      setIsPaymentAddOpen(false)
+      setNewPayment({
+        payment_date: new Date().toISOString().slice(0, 10),
+        payment_month: new Date().toISOString().slice(0, 7) + '-01',
+        total_amount: '',
+        shoe_discount: '0',
+        sibling_discount: '0',
+        additional_discount: '0',
+        payment_method: 'bank_transfer',
+        status: 'paid'
+      })
+
+      // 결제 내역 새로고침
+      await loadStudentPayments(selectedStudent.id)
+      loadStudents() // 학생 목록도 새로고침
+    } catch (error) {
+      console.error('Error adding payment:', error)
+    }
+  }
+
 
   const getGrade = (birthDate: string) => {
     const today = new Date()
@@ -1004,8 +1190,28 @@ export default function StudentManagement() {
             </Dialog>
           </div>
           <div className="flex items-center space-x-4">
+            {/* 검색 */}
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="이름, 전화번호, 수강정보로 검색..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+            {searchTerm && (
+              <span className="text-sm text-muted-foreground">
+                {filteredStudents.length}명 검색됨
+              </span>
+            )}
+          </div>
+          
+          {/* 필터 */}
+          <div className="flex items-center space-x-4 pt-4 border-t">
             {/* 상태 필터 */}
             <div className="flex items-center space-x-2">
+              <span className="text-sm text-muted-foreground">상태:</span>
               <Button
                 variant={statusFilter === 'all' ? 'default' : 'outline'}
                 size="sm"
@@ -1039,20 +1245,23 @@ export default function StudentManagement() {
                 퇴원
               </Button>
             </div>
-            {/* 검색 */}
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="학생 이름으로 검색..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8"
-              />
-            </div>
-            {searchTerm && (
-              <span className="text-sm text-muted-foreground">
-                {filteredStudents.length}명 검색됨
-              </span>
+            
+            {/* 월별 결제 필터 (재원 학생만) */}
+            {statusFilter === '재원' && (
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-muted-foreground">월별결제:</span>
+                <select
+                  value={monthFilter}
+                  onChange={(e) => setMonthFilter(e.target.value)}
+                  className="px-3 py-1 text-sm border rounded-md bg-white"
+                >
+                  {availableMonths.map(month => (
+                    <option key={month.value} value={month.value}>
+                      {month.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
         </CardHeader>
@@ -1068,14 +1277,17 @@ export default function StudentManagement() {
                   <TableHead>등록반</TableHead>
                   <TableHead>수업시간</TableHead>
                   <TableHead>전화번호</TableHead>
-                  <TableHead>최근결제일</TableHead>
+                  <TableHead>
+                    {monthFilter === 'all' ? '최근결제일' : `${monthFilter.split('-')[0]}년 ${monthFilter.split('-')[1]}월`}
+                  </TableHead>
+                  <TableHead>결제금액</TableHead>
                   <TableHead>상태</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center text-muted-foreground">
                       로딩 중...
                     </TableCell>
                   </TableRow>
@@ -1117,7 +1329,93 @@ export default function StudentManagement() {
                         <TableCell>{getClassTypeName(student.class_type_id)}</TableCell>
                         <TableCell className="font-mono text-sm">{getClassScheduleText(student.schedules)}</TableCell>
                         <TableCell>{student.phone}</TableCell>
-                        <TableCell>{student.last_payment_date || "-"}</TableCell>
+                        <TableCell>
+                          {monthFilter === 'all' ? (
+                            // 전체 모드: 최근 결제일 표시
+                            student.last_payment_date ? (
+                              <div className="text-sm">
+                                <div className="text-xs text-muted-foreground">
+                                  {student.last_payment_date}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-sm text-red-600 font-medium">
+                                미결제
+                              </div>
+                            )
+                          ) : (
+                            // 월별 모드: 해당 월 결제 상태 표시
+                            (() => {
+                              const hasPaymentInMonth = allPayments.some(payment => {
+                                if (payment.student_id !== student.id) return false
+                                if (!payment.payment_month) return false
+                                const paymentMonth = new Date(payment.payment_month)
+                                const paymentYearMonth = `${paymentMonth.getFullYear()}-${String(paymentMonth.getMonth() + 1).padStart(2, '0')}`
+                                return paymentYearMonth === monthFilter && payment.status === 'paid'
+                              })
+                              
+                              return hasPaymentInMonth ? (
+                                <Badge className="bg-green-100 text-green-800 border-green-300">
+                                  결제완료
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-red-100 text-red-800 border-red-300">
+                                  미결제
+                                </Badge>
+                              )
+                            })()
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {monthFilter === 'all' ? (
+                            // 전체 모드: 최근 결제금액 표시
+                            student.last_payment_amount ? (
+                              <div className="font-medium">
+                                {student.last_payment_amount.toLocaleString()}원
+                              </div>
+                            ) : (
+                              <div className="text-muted-foreground">-</div>
+                            )
+                          ) : (
+                            // 월별 모드: 해당 월 결제 상태에 따른 금액 표시
+                            (() => {
+                              const hasPaymentInMonth = allPayments.some(payment => {
+                                if (payment.student_id !== student.id) return false
+                                const paymentDate = new Date(payment.payment_date)
+                                const paymentYearMonth = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth() + 1).padStart(2, '0')}`
+                                return paymentYearMonth === monthFilter
+                              })
+                              
+                              if (hasPaymentInMonth) {
+                                // 해당 월에 결제한 경우: 해당 월의 결제금액 표시
+                                const monthPayment = allPayments.find(payment => {
+                                  if (payment.student_id !== student.id) return false
+                                  if (!payment.payment_month) return false
+                                  const paymentMonth = new Date(payment.payment_month)
+                                  const paymentYearMonth = `${paymentMonth.getFullYear()}-${String(paymentMonth.getMonth() + 1).padStart(2, '0')}`
+                                  return paymentYearMonth === monthFilter && payment.status === 'paid'
+                                })
+                                
+                                return monthPayment ? (
+                                  <div className="font-medium">
+                                    {monthPayment.total_amount.toLocaleString()}원
+                                  </div>
+                                ) : (
+                                  <div className="text-muted-foreground">-</div>
+                                )
+                              } else {
+                                // 해당 월에 미결제인 경우: 가장 최근 결제금액을 연하게 표시
+                                return student.last_payment_amount ? (
+                                  <div className="text-muted-foreground text-sm">
+                                    {student.last_payment_amount.toLocaleString()}원
+                                  </div>
+                                ) : (
+                                  <div className="text-muted-foreground">-</div>
+                                )
+                              }
+                            })()
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge className={getStatusColor(student.status)}>
                             {student.status}
@@ -1128,7 +1426,7 @@ export default function StudentManagement() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center text-muted-foreground">
                       {searchTerm ? "검색 결과가 없습니다." : `${getStatusFilterLabel()} 학생이 없습니다.`}
                     </TableCell>
                   </TableRow>
@@ -1286,7 +1584,17 @@ export default function StudentManagement() {
                 {/* 결제 내역 */}
                 <Card>
                   <CardHeader className="pb-1">
-                    <CardTitle className="text-sm">결제 내역</CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm">결제 내역</CardTitle>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={openPaymentAddDialog}
+                      >
+                        <Plus className="w-4 h-4 mr-1" />
+                        결제 추가
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent className="pt-0">
                     {studentPayments.length > 0 ? (
@@ -1295,22 +1603,40 @@ export default function StudentManagement() {
                           <TableHeader>
                             <TableRow>
                               <TableHead className="text-xs p-1">결제일</TableHead>
+                              <TableHead className="text-xs p-1">해당월</TableHead>
                               <TableHead className="text-xs p-1">금액</TableHead>
+                              <TableHead className="text-xs p-1">결제수단</TableHead>
                               <TableHead className="text-xs p-1">할인</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {studentPayments.map((payment) => (
-                              <TableRow key={payment.id} className="text-xs">
-                                <TableCell className="py-1 px-1">{payment.payment_date}</TableCell>
-                                <TableCell className="py-1 px-1 font-medium">
-                                  {payment.total_amount.toLocaleString()}원
-                                </TableCell>
+                            {studentPayments.map((payment) => {
+                              // payment_month 필드를 사용하여 해당월 표시
+                              const paymentMonth = payment.payment_month ? new Date(payment.payment_month) : new Date(payment.payment_date)
+                              const yearMonth = `${paymentMonth.getFullYear()}년 ${paymentMonth.getMonth() + 1}월`
+                              const paymentMethodText = payment.payment_method === 'bank_transfer' ? '계좌이체' :
+                                                      payment.payment_method === 'card' ? '카드결제' :
+                                                      payment.payment_method === 'sports_voucher' ? '체육바우처' : '미지정'
+                              
+                              return (
+                                <TableRow key={payment.id} className="text-xs">
+                                  <TableCell className="py-1 px-1">{payment.payment_date}</TableCell>
+                                  <TableCell className="py-1 px-1 font-medium text-blue-600">
+                                    {yearMonth}
+                                  </TableCell>
+                                  <TableCell className="py-1 px-1 font-medium">
+                                    {payment.total_amount.toLocaleString()}원
+                                  </TableCell>
+                                  <TableCell className="py-1 px-1">
+                                    <Badge variant="outline" className="text-xs">
+                                      {paymentMethodText}
+                                    </Badge>
+                                  </TableCell>
                                 <TableCell className="py-1 px-1">
                                   <div className="space-y-1">
-                                    {payment.climbing_excluded > 0 && (
+                                    {payment.shoe_discount > 0 && (
                                       <div className="text-red-600 text-xs">
-                                        암벽화 제외: {payment.climbing_excluded.toLocaleString()}원
+                                        신발할인: {payment.shoe_discount.toLocaleString()}원
                                       </div>
                                     )}
                                     {payment.sibling_discount > 0 && (
@@ -1323,13 +1649,14 @@ export default function StudentManagement() {
                                         추가할인: {payment.additional_discount.toLocaleString()}원
                                       </div>
                                     )}
-                                    {payment.climbing_excluded === 0 && payment.sibling_discount === 0 && payment.additional_discount === 0 && (
+                                    {payment.shoe_discount === 0 && payment.sibling_discount === 0 && payment.additional_discount === 0 && (
                                       <div className="text-gray-500 text-xs">할인 없음</div>
                                     )}
                                   </div>
                                 </TableCell>
                               </TableRow>
-                            ))}
+                              )
+                            })}
                           </TableBody>
                         </Table>
                       </div>
@@ -1640,6 +1967,126 @@ export default function StudentManagement() {
               </Button>
               <Button onClick={saveLevelHistory}>
                 저장
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 결제 추가 다이얼로그 */}
+      <Dialog open={isPaymentAddOpen} onOpenChange={setIsPaymentAddOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>결제 내역 추가 - {selectedStudent?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm text-muted-foreground">결제일</label>
+                <Input
+                  type="date"
+                  value={newPayment.payment_date}
+                  onChange={(e) => setNewPayment(prev => ({ ...prev, payment_date: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground">해당월</label>
+                <Input
+                  type="month"
+                  value={newPayment.payment_month.slice(0, 7)}
+                  onChange={(e) => setNewPayment(prev => ({ ...prev, payment_month: e.target.value + '-01' }))}
+                />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground">결제 금액(정가)</label>
+                <Input
+                  type="number"
+                  placeholder="예: 120000"
+                  value={newPayment.total_amount}
+                  onChange={(e) => setNewPayment(prev => ({ ...prev, total_amount: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground">결제수단</label>
+                <select
+                  value={newPayment.payment_method}
+                  onChange={(e) => setNewPayment(prev => ({ ...prev, payment_method: e.target.value }))}
+                  className="w-full p-2 border rounded"
+                >
+                  <option value="bank_transfer">계좌이체</option>
+                  <option value="card">카드결제</option>
+                  <option value="sports_voucher">체육바우처</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground">신발 할인</label>
+                <Input
+                  type="number"
+                  placeholder="예: 10000"
+                  value={newPayment.shoe_discount}
+                  onChange={(e) => setNewPayment(prev => ({ ...prev, shoe_discount: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground">형제자매 할인</label>
+                <Input
+                  type="number"
+                  placeholder="예: 10000"
+                  value={newPayment.sibling_discount}
+                  onChange={(e) => setNewPayment(prev => ({ ...prev, sibling_discount: e.target.value }))}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-sm text-muted-foreground">추가 할인</label>
+                <Input
+                  type="number"
+                  placeholder="예: 5000"
+                  value={newPayment.additional_discount}
+                  onChange={(e) => setNewPayment(prev => ({ ...prev, additional_discount: e.target.value }))}
+                />
+              </div>
+            </div>
+            
+            {/* 계산 결과 표시 */}
+            <div className="p-3 rounded-md border bg-muted/30 text-sm">
+              <div className="flex justify-between">
+                <span>정가</span>
+                <span>{parseInt(newPayment.total_amount) || 0}원</span>
+              </div>
+              <div className="flex justify-between">
+                <span>신발 할인</span>
+                <span>- {parseInt(newPayment.shoe_discount) || 0}원</span>
+              </div>
+              <div className="flex justify-between">
+                <span>형제자매 할인</span>
+                <span>- {parseInt(newPayment.sibling_discount) || 0}원</span>
+              </div>
+              <div className="flex justify-between">
+                <span>추가 할인</span>
+                <span>- {parseInt(newPayment.additional_discount) || 0}원</span>
+              </div>
+              <div className="flex justify-between font-semibold pt-1 border-t mt-2">
+                <span>실 결제액</span>
+                <span>
+                  {Math.max(0, 
+                    (parseInt(newPayment.total_amount) || 0) - 
+                    (parseInt(newPayment.shoe_discount) || 0) - 
+                    (parseInt(newPayment.sibling_discount) || 0) - 
+                    (parseInt(newPayment.additional_discount) || 0)
+                  )}원
+                </span>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsPaymentAddOpen(false)}>
+                취소
+              </Button>
+              <Button 
+                onClick={addPayment}
+                disabled={!newPayment.payment_date || !newPayment.total_amount || !newPayment.payment_month}
+              >
+                추가
               </Button>
             </div>
           </div>
