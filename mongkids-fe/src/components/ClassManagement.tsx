@@ -54,6 +54,41 @@ export default function ClassManagement() {
     group_no: number
     students: { id: number; name: string; grade: string; level: string }[]
   }[]>([])
+  
+  // 학생 상세 정보 다이얼로그
+  const [isStudentDetailOpen, setIsStudentDetailOpen] = useState(false)
+  const [selectedStudent, setSelectedStudent] = useState<any>(null)
+  
+  // 학생 상세 정보 열기
+  const openStudentDetail = async (studentId: number) => {
+    try {
+      const { data: student, error } = await supabase
+        .from('students')
+        .select(`
+          *,
+          student_schedules (
+            weekday,
+            time_slot,
+            class_types (
+              category,
+              sessions_per_week
+            )
+          ),
+          student_levels (
+            level,
+            created_at
+          )
+        `)
+        .eq('id', studentId)
+        .single()
+      
+      if (error) throw error
+      setSelectedStudent(student)
+      setIsStudentDetailOpen(true)
+    } catch (error) {
+      console.error('Error loading student details:', error)
+    }
+  }
 
 
   // 이번 달/다음 달 출석예정 자동 생성
@@ -483,12 +518,31 @@ export default function ClassManagement() {
   // 출석 토글 (일별 수업에서 선택된 날짜 기준)
   const toggleAttendanceForSelectedDate = (studentId: number) => {
     const key = getDateKey(selectedDate)
+    let nextStatus: 'present' | 'absent' | 'makeup' | 'makeup_done' | 'none'
+    
     setAttendanceStatus(prev => {
       const mapForStudent = { ...(prev[studentId] || {}) }
       const current = mapForStudent[key] || 'none'
-      const next = current === 'none' ? 'present' : current === 'present' ? 'absent' : current === 'absent' ? 'makeup' : current === 'makeup' ? 'makeup_done' : 'present'
-      mapForStudent[key] = next
+      nextStatus = current === 'none' ? 'present' : current === 'present' ? 'absent' : current === 'absent' ? 'makeup' : current === 'makeup' ? 'makeup_done' : 'present'
+      mapForStudent[key] = nextStatus
       return { ...prev, [studentId]: mapForStudent }
+    })
+    
+    // 깃헙 잔디 그리드도 업데이트
+    setAttendanceGrid(prev => {
+      const studentGrid = { ...(prev[studentId] || {}) }
+      const monthKey = getMonthKey(selectedDate)
+      const weekIndex = getWeekIndexInMonth(selectedDate)
+      
+      if (!studentGrid[monthKey]) {
+        studentGrid[monthKey] = ['none', 'none', 'none', 'none']
+      }
+      
+      const newGrid = [...studentGrid[monthKey]]
+      newGrid[weekIndex] = nextStatus === 'none' ? 'none' : nextStatus
+      studentGrid[monthKey] = newGrid
+      
+      return { ...prev, [studentId]: studentGrid }
     })
   }
 
@@ -612,7 +666,8 @@ export default function ClassManagement() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="ongoing">일별 수업</TabsTrigger>
-          <TabsTrigger value="schedule">전체 수업 시간표</TabsTrigger>
+          <TabsTrigger value="weekly">요일별 시간표</TabsTrigger>
+          <TabsTrigger value="schedule">주차별 수업</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ongoing" className="space-y-4">
@@ -712,37 +767,60 @@ export default function ClassManagement() {
                           </div>
                           <div className="space-y-3">
                             {classItem.students.map((student) => (
-                              <div key={student.id} className="flex items-center justify-between p-2 rounded border">
+                              <div 
+                                key={student.id} 
+                                className="flex items-center justify-between p-2 rounded border cursor-pointer hover:bg-accent/50 transition-colors"
+                                onClick={() => toggleAttendanceForSelectedDate(student.id)}
+                                style={{
+                                  backgroundColor: (() => {
+                                    const s = getStatusOnDate(student.id, selectedDate)
+                                    if (s === 'present') return '#dcfce7' // 연한 초록
+                                    if (s === 'absent') return '#fef2f2' // 연한 빨강
+                                    if (s === 'makeup') return '#fefce8' // 연한 노랑
+                                    if (s === 'makeup_done') return '#f0f9ff' // 연한 파랑
+                                    return 'transparent'
+                                  })(),
+                                  borderColor: (() => {
+                                    const s = getStatusOnDate(student.id, selectedDate)
+                                    if (s === 'present') return '#22c55e' // 초록
+                                    if (s === 'absent') return '#ef4444' // 빨강
+                                    if (s === 'makeup') return '#eab308' // 노랑
+                                    if (s === 'makeup_done') return '#38bdf8' // 파랑
+                                    return '#e5e7eb'
+                                  })()
+                                }}
+                              >
                                 <div className="flex items-center gap-3">
-                                  <Button
-                                    variant={(() => {
-                                      const s = getStatusOnDate(student.id, selectedDate)
-                                      if (s === 'present') return 'default'
-                                      if (s === 'absent') return 'destructive'
-                                      if (s === 'makeup') return 'secondary'
-                                      if (s === 'makeup_done') return 'secondary'
-                                      return 'outline'
-                                    })()}
-                                    size="sm"
-                                    onClick={() => toggleAttendanceForSelectedDate(student.id)}
-                                    className="h-7 px-3"
-                                    style={(() => {
-                                      const s = getStatusOnDate(student.id, selectedDate)
-                                      if (s === 'makeup') return { backgroundColor: '#eab308', color: '#111827', borderColor: '#d1d5db' }
-                                      if (s === 'makeup_done') return { backgroundColor: '#38bdf8', color: '#0b1324', borderColor: '#38bdf8' }
-                                      return {}
-                                    })()}
+                                  <div 
+                                    className="w-4 h-4 rounded-sm border-2"
+                                    style={{
+                                      backgroundColor: (() => {
+                                        const s = getStatusOnDate(student.id, selectedDate)
+                                        if (s === 'present') return '#22c55e' // 초록
+                                        if (s === 'absent') return '#ef4444' // 빨강
+                                        if (s === 'makeup') return '#eab308' // 노랑
+                                        if (s === 'makeup_done') return '#38bdf8' // 파랑
+                                        return '#e5e7eb' // 회색
+                                      })(),
+                                      borderColor: (() => {
+                                        const s = getStatusOnDate(student.id, selectedDate)
+                                        if (s === 'present') return '#16a34a' // 진한 초록
+                                        if (s === 'absent') return '#dc2626' // 진한 빨강
+                                        if (s === 'makeup') return '#ca8a04' // 진한 노랑
+                                        if (s === 'makeup_done') return '#0284c7' // 진한 파랑
+                                        return '#d1d5db'
+                                      })()
+                                    }}
+                                  />
+                                  <span 
+                                    className="font-medium text-blue-600 hover:text-blue-800 cursor-pointer underline"
+                                    onClick={(e) => {
+                                      e.stopPropagation() // 부모 클릭 이벤트 방지
+                                      openStudentDetail(student.id)
+                                    }}
                                   >
-                                    {(() => {
-                                      const s = getStatusOnDate(student.id, selectedDate)
-                                      if (s === 'present') return '출석'
-                                      if (s === 'absent') return '결석'
-                                      if (s === 'makeup') return '보강예정'
-                                      if (s === 'makeup_done') return '보강완료'
-                                      return '출석'
-                                    })()}
-                                  </Button>
-                                  <span className="font-medium">{student.name}</span>
+                                    {student.name}
+                                  </span>
                                   <Badge variant="outline">{student.grade}</Badge>
                                   <div 
                                     style={{
@@ -768,7 +846,7 @@ export default function ClassManagement() {
                                     {([0,1,2,3] as const).map((idx) => (
                                       <button
                                         key={idx}
-                                        className="h-4 w-4 rounded-sm border"
+                                        className="h-4 w-4 rounded-sm border cursor-pointer hover:opacity-80 transition-opacity"
                                         style={{
                                           backgroundColor: (() => {
                                             const state = getWeeklyCells(student.id, selectedDate)[idx]
@@ -779,6 +857,10 @@ export default function ClassManagement() {
                                             return '#e5e7eb' // 회색
                                           })(),
                                           borderColor: '#d1d5db'
+                                        }}
+                                        onClick={(e) => {
+                                          e.stopPropagation() // 부모 클릭 이벤트 방지
+                                          toggleAttendanceForSelectedDate(student.id)
                                         }}
                                         onMouseEnter={() => {
                                           const { present, absent, makeup, makeup_done } = getAttendanceDatesForCellByStatus(student.id, selectedDate, idx)
@@ -947,6 +1029,79 @@ export default function ClassManagement() {
                                         <div className="text-xs text-muted-foreground opacity-0 hover:opacity-100 transition-opacity duration-200">
                                           클릭하여 학생 관리
                                         </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-muted-foreground text-sm">-</div>
+                              )}
+                            </TableCell>
+                          )
+                        })}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="weekly" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>요일별 시간표</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-24">시간</TableHead>
+                      {["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"].map((day) => (
+                        <TableHead key={day} className="text-center min-w-32">
+                          {day}
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {realTimeSlots.map((timeSlot) => (
+                      <TableRow key={timeSlot}>
+                        <TableCell>{timeSlot}</TableCell>
+                        {["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map((dayKey, colIdx) => {
+                          const weekday = colIdx === 6 ? 0 : colIdx + 1 // 일요일을 0으로, 월요일을 1로 변환
+                          const classesForCell = realSchedule
+                            .filter(r => {
+                              const date = new Date(r.date)
+                              const dayOfWeek = (date.getDay() + 6) % 7 // 0:월 ~ 6:일로 변환
+                              return dayOfWeek === weekday && r.time === timeSlot
+                            })
+                            .sort((a,b) => a.group_no - b.group_no)
+                          
+                          return (
+                            <TableCell key={dayKey} className="p-2">
+                              {classesForCell.length > 0 ? (
+                                <div className="space-y-2">
+                                  {classesForCell.map((cls) => (
+                                    <div key={cls.class_id} className="p-2 rounded-lg border bg-card">
+                                      <div className="space-y-1">
+                                        <div className="font-medium text-sm flex items-center gap-2">
+                                          <Badge variant="outline" className="text-xs">{cls.students.length}명</Badge>
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                          그룹 {cls.group_no}
+                                        </div>
+                                        {cls.students.length > 0 ? (
+                                          <div className="text-xs flex flex-wrap gap-x-2 gap-y-1">
+                                            {cls.students.map(s => (
+                                              <span key={s.id} className="inline-flex items-center gap-1">{s.name}</span>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <div className="text-xs text-muted-foreground">학생 없음</div>
+                                        )}
                                       </div>
                                     </div>
                                   ))}
@@ -1150,6 +1305,147 @@ export default function ClassManagement() {
             
           )}
            </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 학생 상세 정보 다이얼로그 */}
+      <Dialog open={isStudentDetailOpen} onOpenChange={setIsStudentDetailOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden">
+          <div className="max-h-[90vh] flex flex-col min-h-0">
+            <DialogHeader className="flex-shrink-0">
+              <DialogTitle className="text-lg font-bold">
+                {selectedStudent?.name} 학생 상세 정보
+              </DialogTitle>
+            </DialogHeader>
+            
+            {selectedStudent && (
+              <div className="flex-1 min-h-0 overflow-y-auto space-y-6">
+                {/* 기본 정보 */}
+                <div className="p-4 bg-primary/5 border rounded-lg">
+                  <h3 className="text-lg font-semibold mb-3">기본 정보</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm text-muted-foreground">이름</label>
+                      <p className="font-medium">{selectedStudent.name}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm text-muted-foreground">전화번호</label>
+                      <p className="font-medium">{selectedStudent.phone || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm text-muted-foreground">생년월일</label>
+                      <p className="font-medium">{selectedStudent.birth_date || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm text-muted-foreground">상태</label>
+                      <Badge 
+                        variant={selectedStudent.status === '재원' ? 'default' : 
+                                selectedStudent.status === '휴원' ? 'secondary' : 'destructive'}
+                      >
+                        {selectedStudent.status}
+                      </Badge>
+                    </div>
+                    <div>
+                      <label className="text-sm text-muted-foreground">현재 레벨</label>
+                      <div className="flex items-center gap-2">
+                        <div 
+                          style={{
+                            backgroundColor: 
+                              selectedStudent.current_level === 'NONE' ? '#e5e7eb' :
+                              selectedStudent.current_level === 'WHITE' ? '#ffffff' :
+                              selectedStudent.current_level === 'YELLOW' ? '#fde047' :
+                              selectedStudent.current_level === 'GREEN' ? '#86efac' :
+                              selectedStudent.current_level === 'BLUE' ? '#93c5fd' :
+                              selectedStudent.current_level === 'RED' ? '#fca5a5' :
+                              selectedStudent.current_level === 'BLACK' ? '#374151' :
+                              selectedStudent.current_level === 'GOLD' ? '#fbbf24' : '#e5e7eb',
+                            border: selectedStudent.current_level === 'WHITE' ? '1px solid #d1d5db' : 'none',
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '4px',
+                            display: 'inline-block'
+                          }}
+                        />
+                        <span className="font-medium">{selectedStudent.current_level || 'NONE'}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm text-muted-foreground">등록일</label>
+                      <p className="font-medium">{selectedStudent.created_at ? new Date(selectedStudent.created_at).toLocaleDateString('ko-KR') : '-'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 수업 일정 */}
+                <div className="p-4 bg-primary/5 border rounded-lg">
+                  <h3 className="text-lg font-semibold mb-3">수업 일정</h3>
+                  {selectedStudent.student_schedules && selectedStudent.student_schedules.length > 0 ? (
+                    <div className="space-y-2">
+                      {selectedStudent.student_schedules.map((schedule: any, index: number) => {
+                        const weekdayNames = ['월', '화', '수', '목', '금', '토', '일']
+                        return (
+                          <div key={index} className="flex items-center gap-4 p-3 bg-white rounded border">
+                            <Badge variant="outline">{weekdayNames[schedule.weekday]}</Badge>
+                            <span className="font-medium">{schedule.time_slot}</span>
+                            <span className="text-muted-foreground">
+                              {schedule.class_types?.category} 주 {schedule.class_types?.sessions_per_week}회
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">등록된 수업 일정이 없습니다.</p>
+                  )}
+                </div>
+
+                {/* 레벨 히스토리 */}
+                <div className="p-4 bg-primary/5 border rounded-lg">
+                  <h3 className="text-lg font-semibold mb-3">레벨 히스토리</h3>
+                  {selectedStudent.student_levels && selectedStudent.student_levels.length > 0 ? (
+                    <div className="space-y-2">
+                      {selectedStudent.student_levels
+                        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                        .map((level: any, index: number) => (
+                          <div key={index} className="flex items-center gap-4 p-3 bg-white rounded border">
+                            <div 
+                              style={{
+                                backgroundColor: 
+                                  level.level === 'NONE' ? '#e5e7eb' :
+                                  level.level === 'WHITE' ? '#ffffff' :
+                                  level.level === 'YELLOW' ? '#fde047' :
+                                  level.level === 'GREEN' ? '#86efac' :
+                                  level.level === 'BLUE' ? '#93c5fd' :
+                                  level.level === 'RED' ? '#fca5a5' :
+                                  level.level === 'BLACK' ? '#374151' :
+                                  level.level === 'GOLD' ? '#fbbf24' : '#e5e7eb',
+                                border: level.level === 'WHITE' ? '1px solid #d1d5db' : 'none',
+                                width: '20px',
+                                height: '20px',
+                                borderRadius: '4px',
+                                display: 'inline-block'
+                              }}
+                            />
+                            <span className="font-medium">{level.level}</span>
+                            <span className="text-muted-foreground text-sm">
+                              {new Date(level.created_at).toLocaleDateString('ko-KR')}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">레벨 히스토리가 없습니다.</p>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            <div className="flex justify-end gap-2 pt-4 border-t mt-4 flex-shrink-0">
+              <Button variant="outline" onClick={() => setIsStudentDetailOpen(false)}>
+                닫기
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
