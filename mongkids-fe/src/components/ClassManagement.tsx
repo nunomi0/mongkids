@@ -15,6 +15,7 @@ import { ko } from "date-fns/locale"
 import { startOfWeek, endOfWeek, startOfMonth } from "date-fns"
 import { supabase } from "../lib/supabase"
 import { Input } from "./ui/input"
+import StudentDetailModal from "./StudentDetailModal"
 
 
 
@@ -57,37 +58,13 @@ export default function ClassManagement() {
   
   // 학생 상세 정보 다이얼로그
   const [isStudentDetailOpen, setIsStudentDetailOpen] = useState(false)
-  const [selectedStudent, setSelectedStudent] = useState<any>(null)
+  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null)
   
   // 학생 상세 정보 열기
-  const openStudentDetail = async (studentId: number) => {
-    try {
-      const { data: student, error } = await supabase
-        .from('students')
-        .select(`
-          *,
-          student_schedules (
-            weekday,
-            time_slot,
-            class_types (
-              category,
-              sessions_per_week
-            )
-          ),
-          student_levels (
-            level,
-            created_at
-          )
-        `)
-        .eq('id', studentId)
-        .single()
-      
-      if (error) throw error
-      setSelectedStudent(student)
-      setIsStudentDetailOpen(true)
-    } catch (error) {
-      console.error('Error loading student details:', error)
-    }
+  const openStudentDetail = (studentId: number) => {
+    setSelectedStudentId(studentId)
+    setIsStudentDetailOpen(true)
+    console.log(selectedStudentId)
   }
 
 
@@ -1308,146 +1285,12 @@ export default function ClassManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* 학생 상세 정보 다이얼로그 */}
-      <Dialog open={isStudentDetailOpen} onOpenChange={setIsStudentDetailOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden">
-          <div className="max-h-[90vh] flex flex-col min-h-0">
-            <DialogHeader className="flex-shrink-0">
-              <DialogTitle className="text-lg font-bold">
-                {selectedStudent?.name} 학생 상세 정보
-              </DialogTitle>
-            </DialogHeader>
-            
-            {selectedStudent && (
-              <div className="flex-1 min-h-0 overflow-y-auto space-y-6">
-                {/* 기본 정보 */}
-                <div className="p-4 bg-primary/5 border rounded-lg">
-                  <h3 className="text-lg font-semibold mb-3">기본 정보</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm text-muted-foreground">이름</label>
-                      <p className="font-medium">{selectedStudent.name}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm text-muted-foreground">전화번호</label>
-                      <p className="font-medium">{selectedStudent.phone || '-'}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm text-muted-foreground">생년월일</label>
-                      <p className="font-medium">{selectedStudent.birth_date || '-'}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm text-muted-foreground">상태</label>
-                      <Badge 
-                        variant={selectedStudent.status === '재원' ? 'default' : 
-                                selectedStudent.status === '휴원' ? 'secondary' : 'destructive'}
-                      >
-                        {selectedStudent.status}
-                      </Badge>
-                    </div>
-                    <div>
-                      <label className="text-sm text-muted-foreground">현재 레벨</label>
-                      <div className="flex items-center gap-2">
-                        <div 
-                          style={{
-                            backgroundColor: 
-                              selectedStudent.current_level === 'NONE' ? '#e5e7eb' :
-                              selectedStudent.current_level === 'WHITE' ? '#ffffff' :
-                              selectedStudent.current_level === 'YELLOW' ? '#fde047' :
-                              selectedStudent.current_level === 'GREEN' ? '#86efac' :
-                              selectedStudent.current_level === 'BLUE' ? '#93c5fd' :
-                              selectedStudent.current_level === 'RED' ? '#fca5a5' :
-                              selectedStudent.current_level === 'BLACK' ? '#374151' :
-                              selectedStudent.current_level === 'GOLD' ? '#fbbf24' : '#e5e7eb',
-                            border: selectedStudent.current_level === 'WHITE' ? '1px solid #d1d5db' : 'none',
-                            width: '20px',
-                            height: '20px',
-                            borderRadius: '4px',
-                            display: 'inline-block'
-                          }}
-                        />
-                        <span className="font-medium">{selectedStudent.current_level || 'NONE'}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-sm text-muted-foreground">등록일</label>
-                      <p className="font-medium">{selectedStudent.created_at ? new Date(selectedStudent.created_at).toLocaleDateString('ko-KR') : '-'}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 수업 일정 */}
-                <div className="p-4 bg-primary/5 border rounded-lg">
-                  <h3 className="text-lg font-semibold mb-3">수업 일정</h3>
-                  {selectedStudent.student_schedules && selectedStudent.student_schedules.length > 0 ? (
-                    <div className="space-y-2">
-                      {selectedStudent.student_schedules.map((schedule: any, index: number) => {
-                        const weekdayNames = ['월', '화', '수', '목', '금', '토', '일']
-                        return (
-                          <div key={index} className="flex items-center gap-4 p-3 bg-white rounded border">
-                            <Badge variant="outline">{weekdayNames[schedule.weekday]}</Badge>
-                            <span className="font-medium">{schedule.time_slot}</span>
-                            <span className="text-muted-foreground">
-                              {schedule.class_types?.category} 주 {schedule.class_types?.sessions_per_week}회
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground">등록된 수업 일정이 없습니다.</p>
-                  )}
-                </div>
-
-                {/* 레벨 히스토리 */}
-                <div className="p-4 bg-primary/5 border rounded-lg">
-                  <h3 className="text-lg font-semibold mb-3">레벨 히스토리</h3>
-                  {selectedStudent.student_levels && selectedStudent.student_levels.length > 0 ? (
-                    <div className="space-y-2">
-                      {selectedStudent.student_levels
-                        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                        .map((level: any, index: number) => (
-                          <div key={index} className="flex items-center gap-4 p-3 bg-white rounded border">
-                            <div 
-                              style={{
-                                backgroundColor: 
-                                  level.level === 'NONE' ? '#e5e7eb' :
-                                  level.level === 'WHITE' ? '#ffffff' :
-                                  level.level === 'YELLOW' ? '#fde047' :
-                                  level.level === 'GREEN' ? '#86efac' :
-                                  level.level === 'BLUE' ? '#93c5fd' :
-                                  level.level === 'RED' ? '#fca5a5' :
-                                  level.level === 'BLACK' ? '#374151' :
-                                  level.level === 'GOLD' ? '#fbbf24' : '#e5e7eb',
-                                border: level.level === 'WHITE' ? '1px solid #d1d5db' : 'none',
-                                width: '20px',
-                                height: '20px',
-                                borderRadius: '4px',
-                                display: 'inline-block'
-                              }}
-                            />
-                            <span className="font-medium">{level.level}</span>
-                            <span className="text-muted-foreground text-sm">
-                              {new Date(level.created_at).toLocaleDateString('ko-KR')}
-                            </span>
-                          </div>
-                        ))}
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground">레벨 히스토리가 없습니다.</p>
-                  )}
-                </div>
-              </div>
-            )}
-            
-            <div className="flex justify-end gap-2 pt-4 border-t mt-4 flex-shrink-0">
-              <Button variant="outline" onClick={() => setIsStudentDetailOpen(false)}>
-                닫기
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* 학생 상세 정보 모달 */}
+      <StudentDetailModal
+        isOpen={isStudentDetailOpen}
+        onClose={() => setIsStudentDetailOpen(false)}
+        studentId={selectedStudentId}
+      />
     </div>
   )
 }
