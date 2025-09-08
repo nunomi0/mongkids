@@ -16,6 +16,7 @@ import { startOfWeek, endOfWeek, startOfMonth } from "date-fns"
 import { supabase } from "../lib/supabase"
 import { Input } from "./ui/input"
 import StudentDetailModal from "./StudentDetailModal"
+import ClassDetailCard from "./ClassDetailCard"
 
 
 
@@ -37,12 +38,13 @@ export default function ClassManagement() {
   // 캘린더 하이라이트(호버)용 상태
   const [hoveredCalendarDates, setHoveredCalendarDates] = useState<{present: Date[]; absent: Date[]; makeup: Date[]; makeup_done: Date[]}>({ present: [], absent: [], makeup: [], makeup_done: [] })
   const [isGenerating, setIsGenerating] = useState(false)
+  const [hasAttendanceData, setHasAttendanceData] = useState<{daily: boolean, weekly: boolean}>({daily: false, weekly: false})
   const [realSchedule, setRealSchedule] = useState<{
     date: string
     time: string
     group_no: number
     class_id: number
-    students: { id: number; name: string }[]
+    students: { id: number; name: string; grade?: string; level?: string }[]
   }[]>([])
   const [isManageOpen, setIsManageOpen] = useState(false)
   const [manageClass, setManageClass] = useState<{ class_id: number; date: string; time: string; group_no: number; students: { id: number; name: string }[] } | null>(null)
@@ -59,6 +61,11 @@ export default function ClassManagement() {
   // 학생 상세 정보 다이얼로그
   const [isStudentDetailOpen, setIsStudentDetailOpen] = useState(false)
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null)
+  // 주차별 수업 상세
+  const [isClassDetailOpen, setIsClassDetailOpen] = useState(false)
+  const [selectedClassForDetail, setSelectedClassForDetail] = useState<{ class_id: number; date: string; time: string; group_no: number; students: { id: number; name: string }[] } | null>(null)
+  const [selectedClassDate, setSelectedClassDate] = useState<Date | null>(null)
+  
   
   // 학생 상세 정보 열기
   const openStudentDetail = (studentId: number) => {
@@ -67,6 +74,181 @@ export default function ClassManagement() {
     console.log(selectedStudentId)
   }
 
+
+  // 특정 날짜 출석예정 생성
+  const generateAttendanceForDate = async (date: Date) => {
+    try {
+      setIsGenerating(true)
+      const dateStr = toDateStr(date)
+      const weekday = (date.getDay() + 6) % 7 // 0:월 ~ 6:일 (DB 규약에 맞춤)
+
+      // 1) 재원 학생과 해당 요일 스케줄 로드
+      const { data: students, error: sErr } = await supabase
+        .from('students')
+        .select('id, status')
+        .eq('status', '재원')
+      if (sErr) throw sErr
+      const studentIds = (students || []).map(s => s.id)
+      if (studentIds.length === 0) return
+
+      const { data: schedules, error: schErr } = await supabase
+        .from('student_schedules')
+        .select('*')
+        .in('student_id', studentIds)
+        .eq('weekday', weekday)
+      if (schErr) throw schErr
+
+      if (schedules.length === 0) {
+        alert('해당 날짜에 수업이 있는 학생이 없습니다.')
+        return
+      }
+
+      // 2) 해당 날짜의 클래스 upsert
+      const uniqueKey = new Set<string>()
+      const classesForDay: { date: string; time: string; group_no: number }[] = []
+      schedules.forEach(s => {
+        const time = s.time
+        const group = s.group_no
+        const key = `${dateStr}_${time}_${group}`
+        if (!uniqueKey.has(key)) {
+          uniqueKey.add(key)
+          classesForDay.push({ date: dateStr, time, group_no: group })
+        }
+      })
+
+      if (classesForDay.length) {
+        // upsert classes
+        const { data: upserted, error } = await supabase
+          .from('classes')
+          .upsert(classesForDay, { onConflict: 'date,time,group_no' })
+          .select('id, date, time, group_no')
+        if (error) throw error
+
+        // class_id 매핑
+        const classIdByKey = new Map<string, number>()
+        ;(upserted || []).forEach(c => {
+          classIdByKey.set(`${c.date}_${c.time}_${c.group_no}`, c.id)
+        })
+
+        // attendance 예정 upsert
+        const attendanceUpserts = schedules.map(s => {
+          const key = `${dateStr}_${s.time}_${s.group_no}`
+          const classId = classIdByKey.get(key)
+          return { student_id: s.student_id, class_id: classId, status: '예정' as const }
+        }).filter(a => a.class_id)
+
+        if (attendanceUpserts.length) {
+          const { error } = await supabase
+            .from('attendance')
+            .upsert(attendanceUpserts, { onConflict: 'student_id,class_id' })
+          if (error) throw error
+        }
+      }
+
+      alert('출석 예정 생성이 완료되었습니다.')
+      // 생성 후 일별 수업 데이터 갱신
+      await loadDailyClasses(date)
+    } catch (e) {
+      console.error('출석 예정 생성 오류:', e)
+      alert('출석 예정 생성 중 오류가 발생했습니다. 콘솔을 확인해주세요.')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  // 특정 주차 출석예정 생성
+  const generateAttendanceForWeek = async (start: Date, end: Date) => {
+    try {
+      setIsGenerating(true)
+      const toDateStr = (d: Date) => `${d.getFullYear()}-${`${d.getMonth()+1}`.padStart(2,'0')}-${`${d.getDate()}`.padStart(2,'0')}`
+
+      // 1) 재원 학생과 스케줄 로드
+      const { data: students, error: sErr } = await supabase
+        .from('students')
+        .select('id, status')
+        .eq('status', '재원')
+      if (sErr) throw sErr
+      const studentIds = (students || []).map(s => s.id)
+      if (studentIds.length === 0) return
+
+      const { data: schedules, error: schErr } = await supabase
+        .from('student_schedules')
+        .select('*')
+        .in('student_id', studentIds)
+      if (schErr) throw schErr
+
+      // 2) 해당 주차의 각 날짜에 대해 요일/시간/그룹 기준 class upsert, attendance upsert
+      const classUpserts: { date: string; time: string; group_no: number }[] = []
+      const attendanceUpserts: { student_id: number; class_id: number; status: string; is_makeup: boolean; memo: string | null }[] = []
+
+      // 날짜 루프
+      for (let d = new Date(start); d <= end; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+        const weekday = (d.getDay() + 6) % 7 // 0:월 ~ 6:일 (DB 규약에 맞춤)
+        const daySchedules = (schedules || []).filter(s => s.weekday === weekday)
+        if (daySchedules.length === 0) continue
+
+        const dateStr = toDateStr(d)
+
+        // 날짜별 클래스 upsert 수행 (중복 제거)
+        const uniqueKey = new Set<string>()
+        const classesForDay: { date: string; time: string; group_no: number }[] = []
+        daySchedules.forEach(s => {
+          const time = s.time
+          const group = s.group_no
+          const key = `${dateStr}_${time}_${group}`
+          if (!uniqueKey.has(key)) {
+            uniqueKey.add(key)
+            classesForDay.push({ date: dateStr, time, group_no: group })
+          }
+        })
+
+        if (classesForDay.length) {
+          // upsert classes
+          const { data: upserted, error } = await supabase
+            .from('classes')
+            .upsert(classesForDay, { onConflict: 'date,time,group_no' })
+            .select('id, date, time, group_no')
+          if (error) throw error
+
+          // class_id 매핑
+          const classIdByKey = new Map<string, number>()
+          ;(upserted || []).forEach(c => {
+            classIdByKey.set(`${c.date}_${c.time}_${c.group_no}`, c.id)
+          })
+
+          // 해당 날짜의 각 스케줄 → attendance 예정 upsert
+          for (const s of daySchedules) {
+            const key = `${dateStr}_${s.time}_${s.group_no}`
+            const classId = classIdByKey.get(key)
+            if (!classId) continue
+            attendanceUpserts.push({ student_id: s.student_id, class_id: classId, status: '예정', is_makeup: false, memo: null })
+          }
+        }
+      }
+
+      // 3) attendance upsert (UNIQUE student_id,class_id) - 최소 컬럼만 사용
+      if (attendanceUpserts.length) {
+        const minimal = attendanceUpserts.map(a => ({
+          student_id: a.student_id,
+          class_id: a.class_id,
+          status: '예정' as const
+        }))
+        const { error } = await supabase
+          .from('attendance')
+          .upsert(minimal, { onConflict: 'student_id,class_id' })
+        if (error) throw error
+      }
+
+      alert('출석 예정 생성이 완료되었습니다.')
+      // 생성 후 실시간 시간표 갱신
+      await loadRealSchedule(start, end)
+    } catch (e) {
+      console.error('출석 예정 생성 오류:', e)
+      alert('출석 예정 생성 중 오류가 발생했습니다. 콘솔을 확인해주세요.')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
 
   // 이번 달/다음 달 출석예정 자동 생성
   const generateAttendanceForMonth = async (base: Date) => {
@@ -178,7 +360,7 @@ export default function ClassManagement() {
 
       const { data, error } = await supabase
         .from('classes')
-        .select('id, date, time, group_no, attendance:attendance(student_id, students:students(id, name))')
+        .select('id, date, time, group_no, attendance:attendance(student_id, students:students(id, name, birth_date, current_level))')
         .gte('date', startStr)
         .lte('date', endStr)
         .order('date', { ascending: true })
@@ -191,12 +373,35 @@ export default function ClassManagement() {
         date: c.date,
         time: c.time,
         group_no: c.group_no,
-        students: ((c.attendance as any[]) || []).map(a => ({ id: a.students?.id, name: a.students?.name })).filter(s => !!s && !!s.id)
+        students: ((c.attendance as any[]) || []).map(a => {
+          const st = a.students
+          if (!st) return null
+          // 학년 계산
+          let grade = ''
+          if (st.birth_date) {
+            const birth = new Date(st.birth_date)
+            const today = new Date()
+            const age = today.getFullYear() - birth.getFullYear()
+            const monthDiff = today.getMonth() - birth.getMonth()
+            if (age < 6) grade = `${age}세`
+            else if (age === 6) grade = monthDiff >= 0 ? '초1' : '6세'
+            else if (age <= 12) grade = `초${age - 5}`
+            else if (age <= 15) grade = `중${age - 12}`
+            else if (age <= 18) grade = `고${age - 15}`
+            else grade = '성인'
+          }
+          return { id: st.id, name: st.name, grade, level: st.current_level || 'NONE' }
+        }).filter(s => !!s && !!s.id)
       }))
       setRealSchedule(mapped)
+      
+      // 해당 주차에 출석 데이터가 있는지 확인
+      const hasData = mapped.length > 0
+      setHasAttendanceData(prev => ({ ...prev, weekly: hasData }))
     } catch (e) {
       console.error('실시간 시간표 로드 오류:', e)
       setRealSchedule([])
+      setHasAttendanceData(prev => ({ ...prev, weekly: false }))
     }
   }
 
@@ -269,9 +474,14 @@ export default function ClassManagement() {
       }))
 
       setDailyClasses(mapped)
+      
+      // 해당 날짜에 출석 데이터가 있는지 확인
+      const hasData = mapped.length > 0
+      setHasAttendanceData(prev => ({ ...prev, daily: hasData }))
     } catch (e) {
       console.error('일별 수업 로드 오류:', e)
       setDailyClasses([])
+      setHasAttendanceData(prev => ({ ...prev, daily: false }))
     }
   }
 
@@ -332,6 +542,14 @@ export default function ClassManagement() {
     setManageClass(cls)
     setIsManageOpen(true)
     setStudentSearch("")
+  }
+
+  
+
+  const openClassDetailDialog = (cls: { class_id: number; date: string; time: string; group_no: number; students: { id: number; name: string }[] }) => {
+    setSelectedClassForDetail(cls)
+    setSelectedClassDate(new Date(cls.date))
+    setIsClassDetailOpen(true)
   }
 
   const addStudentToClass = async (studentId: number) => {
@@ -500,7 +718,13 @@ export default function ClassManagement() {
     setAttendanceStatus(prev => {
       const mapForStudent = { ...(prev[studentId] || {}) }
       const current = mapForStudent[key] || 'none'
-      nextStatus = current === 'none' ? 'present' : current === 'present' ? 'absent' : current === 'absent' ? 'makeup' : current === 'makeup' ? 'makeup_done' : 'present'
+      // 순환: none -> present -> absent -> makeup -> makeup_done -> none
+      nextStatus =
+        current === 'none' ? 'present'
+        : current === 'present' ? 'absent'
+        : current === 'absent' ? 'makeup'
+        : current === 'makeup' ? 'makeup_done'
+        : 'none'
       mapForStudent[key] = nextStatus
       return { ...prev, [studentId]: mapForStudent }
     })
@@ -612,11 +836,11 @@ export default function ClassManagement() {
     return ["none","none","none","none"] as ("present"|"absent"|"makeup"|"none")[]
   }
 
-  const setWeeklyCell = (studentId: number, date: Date, index: number, value: "present"|"absent"|"makeup"|"none") => {
+  const setWeeklyCell = (studentId: number, date: Date, index: number, value: "present"|"absent"|"makeup"|"makeup_done"|"none") => {
     const monthKey = getMonthKey(date)
     setAttendanceGrid(prev => {
       const studentMap = { ...(prev[studentId] || {}) }
-      const cells = [...(studentMap[monthKey] || ["none","none","none","none"] as const)] as ("present"|"absent"|"makeup"|"none")[]
+      const cells = [...(studentMap[monthKey] || ["none","none","none","none"] as const)] as ("present"|"absent"|"makeup"|"makeup_done"|"none")[]
       cells[index] = value
       return { ...prev, [studentId]: { ...studentMap, [monthKey]: cells } }
     })
@@ -626,7 +850,13 @@ export default function ClassManagement() {
   const cycleWeeklyCell = (studentId: number, date: Date, index: number) => {
     const cells = getWeeklyCells(studentId, date)
     const current = cells[index]
-    const next = current === "none" ? "present" : current === "present" ? "absent" : current === "absent" ? "makeup" : "none"
+    // 순환: none -> present -> absent -> makeup -> makeup_done -> none
+    const next =
+      current === 'none' ? 'present'
+      : current === 'present' ? 'absent'
+      : current === 'absent' ? 'makeup'
+      : current === 'makeup' ? 'makeup_done'
+      : 'none'
     setWeeklyCell(studentId, date, index, next)
   }
 
@@ -643,7 +873,6 @@ export default function ClassManagement() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="ongoing">일별 수업</TabsTrigger>
-          <TabsTrigger value="weekly">요일별 시간표</TabsTrigger>
           <TabsTrigger value="schedule">주차별 수업</TabsTrigger>
         </TabsList>
 
@@ -720,164 +949,30 @@ export default function ClassManagement() {
                   {dailyClasses
                     .sort((a, b) => a.time.localeCompare(b.time))
                     .map((classItem, index) => (
-                    <Card key={index}>
-                      <CardHeader>
-                        <CardTitle className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span>{format(selectedDate, 'MM.dd', { locale: ko })}</span>
-                            <span>•</span>
-                            <span>{format(selectedDate, 'EEEE', { locale: ko })}</span>
-                            <span>•</span>
-                            <span>{classItem.time}</span>
-                          </div>
-                          <Badge variant="outline">{classItem.students.length}명</Badge>
-                        </CardTitle>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <span>그룹 {classItem.group_no}</span>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="font-medium">참여 학생 ({classItem.students.length}명)</p>
-                            <span className="text-xs text-muted-foreground">{format(selectedDate, 'yyyy.MM.dd')} 기준</span>
-                          </div>
-                          <div className="space-y-3">
-                            {classItem.students.map((student) => (
-                              <div 
-                                key={student.id} 
-                                className="flex items-center justify-between p-2 rounded border cursor-pointer hover:bg-accent/50 transition-colors"
-                                onClick={() => toggleAttendanceForSelectedDate(student.id)}
-                                style={{
-                                  backgroundColor: (() => {
-                                    const s = getStatusOnDate(student.id, selectedDate)
-                                    if (s === 'present') return '#dcfce7' // 연한 초록
-                                    if (s === 'absent') return '#fef2f2' // 연한 빨강
-                                    if (s === 'makeup') return '#fefce8' // 연한 노랑
-                                    if (s === 'makeup_done') return '#f0f9ff' // 연한 파랑
-                                    return 'transparent'
-                                  })(),
-                                  borderColor: (() => {
-                                    const s = getStatusOnDate(student.id, selectedDate)
-                                    if (s === 'present') return '#22c55e' // 초록
-                                    if (s === 'absent') return '#ef4444' // 빨강
-                                    if (s === 'makeup') return '#eab308' // 노랑
-                                    if (s === 'makeup_done') return '#38bdf8' // 파랑
-                                    return '#e5e7eb'
-                                  })()
-                                }}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div 
-                                    className="w-4 h-4 rounded-sm border-2"
-                                    style={{
-                                      backgroundColor: (() => {
-                                        const s = getStatusOnDate(student.id, selectedDate)
-                                        if (s === 'present') return '#22c55e' // 초록
-                                        if (s === 'absent') return '#ef4444' // 빨강
-                                        if (s === 'makeup') return '#eab308' // 노랑
-                                        if (s === 'makeup_done') return '#38bdf8' // 파랑
-                                        return '#e5e7eb' // 회색
-                                      })(),
-                                      borderColor: (() => {
-                                        const s = getStatusOnDate(student.id, selectedDate)
-                                        if (s === 'present') return '#16a34a' // 진한 초록
-                                        if (s === 'absent') return '#dc2626' // 진한 빨강
-                                        if (s === 'makeup') return '#ca8a04' // 진한 노랑
-                                        if (s === 'makeup_done') return '#0284c7' // 진한 파랑
-                                        return '#d1d5db'
-                                      })()
-                                    }}
-                                  />
-                                  <span 
-                                    className="font-medium text-blue-600 hover:text-blue-800 cursor-pointer underline"
-                                    onClick={(e) => {
-                                      e.stopPropagation() // 부모 클릭 이벤트 방지
-                                      openStudentDetail(student.id)
-                                    }}
-                                  >
-                                    {student.name}
-                                  </span>
-                                  <Badge variant="outline">{student.grade}</Badge>
-                                  <div 
-                                    style={{
-                                      backgroundColor: 
-                                        student.level === 'NONE' ? '#e5e7eb' :
-                                        student.level === 'WHITE' ? '#ffffff' :
-                                        student.level === 'YELLOW' ? '#fde047' :
-                                        student.level === 'GREEN' ? '#86efac' :
-                                        student.level === 'BLUE' ? '#93c5fd' :
-                                        student.level === 'RED' ? '#fca5a5' :
-                                        student.level === 'BLACK' ? '#374151' :
-                                        student.level === 'GOLD' ? '#fbbf24' : '#e5e7eb',
-                                      border: student.level === 'WHITE' ? '1px solid #d1d5db' : 'none',
-                                      width: '12px',
-                                      height: '12px',
-                                      borderRadius: '2px',
-                                      display: 'inline-block'
-                                    }}
-                                  />
-                                </div>
-                                <div className="flex flex-col items-end gap-2">
-                                  <div className="flex gap-1">
-                                    {([0,1,2,3] as const).map((idx) => (
-                                      <button
-                                        key={idx}
-                                        className="h-4 w-4 rounded-sm border cursor-pointer hover:opacity-80 transition-opacity"
-                                        style={{
-                                          backgroundColor: (() => {
-                                            const state = getWeeklyCells(student.id, selectedDate)[idx]
-                                            if (state === 'present') return '#22c55e' // 초록
-                                            if (state === 'absent') return '#ef4444' // 빨강
-                                            if (state === 'makeup') return '#eab308' // 노랑
-                                            if (state === 'makeup_done') return '#38bdf8' // 하늘색
-                                            return '#e5e7eb' // 회색
-                                          })(),
-                                          borderColor: '#d1d5db'
-                                        }}
-                                        onClick={(e) => {
-                                          e.stopPropagation() // 부모 클릭 이벤트 방지
-                                          toggleAttendanceForSelectedDate(student.id)
-                                        }}
-                                        onMouseEnter={() => {
-                                          const { present, absent, makeup, makeup_done } = getAttendanceDatesForCellByStatus(student.id, selectedDate, idx)
-                                          setHoveredCalendarDates({
-                                            present: toDateObjectsFromMonthDay(selectedDate, present),
-                                            absent: toDateObjectsFromMonthDay(selectedDate, absent),
-                                            makeup: toDateObjectsFromMonthDay(selectedDate, makeup),
-                                            makeup_done: toDateObjectsFromMonthDay(selectedDate, makeup_done),
-                                          })
-                                        }}
-                                        onMouseLeave={() => setHoveredCalendarDates({ present: [], absent: [], makeup: [], makeup_done: [] })}
-                                        title={(() => {
-                                          const { present, absent, makeup, makeup_done } = getAttendanceDatesForCellByStatus(student.id, selectedDate, idx)
-                                          const parts = [] as string[]
-                                          if (present.length) parts.push(`출석: ${present.join(', ')}`)
-                                          if (absent.length) parts.push(`결석: ${absent.join(', ')}`)
-                                          if (makeup.length) parts.push(`보강예정: ${makeup.join(', ')}`)
-                                          if (makeup_done.length) parts.push(`보강완료: ${makeup_done.join(', ')}`)
-                                          return parts.length ? parts.join(' | ') : '기록 없음'
-                                        })()}
-                                        aria-label={`week-${idx+1}`}
-                                      />
-                                    ))}
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="text-[10px] text-muted-foreground">이번 달 출석 {getMonthlyAttendanceCount(student.id, selectedDate)}회</div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                      <ClassDetailCard
+                        classItem={classItem}
+                        selectedDate={selectedDate}
+                        getStatusOnDate={getStatusOnDate}
+                        getWeeklyCells={getWeeklyCells}
+                        getAttendanceDatesForCellByStatus={getAttendanceDatesForCellByStatus}
+                        toggleAttendanceForSelectedDate={toggleAttendanceForSelectedDate}
+                        openStudentDetail={openStudentDetail}
+                        setHoveredCalendarDates={setHoveredCalendarDates}
+                        toDateObjectsFromMonthDay={toDateObjectsFromMonthDay}
+                      />
+                    ))}
                 </div>
               ) : (
                 <Card>
                   <CardContent className="p-6 text-center">
-                    <p className="text-muted-foreground">선택한 날짜에 진행 중인 수업이 없습니다.</p>
+                    <p className="text-muted-foreground mb-4">선택한 날짜에 진행 중인 수업이 없습니다.</p>
+                    <Button 
+                      onClick={() => generateAttendanceForDate(selectedDate)}
+                      disabled={isGenerating}
+                      className="bg-primary hover:bg-primary/90"
+                    >
+                      {isGenerating ? "생성 중..." : "출석부 생성"}
+                    </Button>
                   </CardContent>
                 </Card>
               )}
@@ -888,21 +983,7 @@ export default function ClassManagement() {
         <TabsContent value="schedule">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>주차별 수업 시간표</CardTitle>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" disabled={isGenerating} onClick={() => generateAttendanceForMonth(new Date())}>
-                    이번 달 출석예정 생성
-                  </Button>
-                  <Button variant="default" size="sm" disabled={isGenerating} onClick={() => {
-                    const now = new Date()
-                    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-                    generateAttendanceForMonth(next)
-                  }}>
-                    다음 달 출석예정 생성
-                  </Button>
-                </div>
-              </div>
+              <CardTitle>주차별 수업 시간표</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="mb-6">
@@ -929,13 +1010,13 @@ export default function ClassManagement() {
                           return date >= scheduleWeek.start && date <= scheduleWeek.end
                         }
                       }}
-                                              modifiersStyles={{
-                          selected: {
-                            backgroundColor: 'hsl(var(--primary))',
-                            color: 'hsl(var(--primary-foreground))',
-                            fontWeight: 'bold'
-                          }
-                        }}
+                      modifiersStyles={{
+                        selected: {
+                          backgroundColor: '#000000',
+                          color: '#ffffff',
+                          fontWeight: 'bold'
+                        }
+                      }}
                     />
                   </div>
                   <div className="p-3 bg-primary/5 border rounded-md h-fit">
@@ -947,12 +1028,13 @@ export default function ClassManagement() {
                   </div>
                 </div>
               </div>
+              {realTimeSlots.length > 0 ? (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-24">시간</TableHead>
-                      {["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"].map((day) => (
+                        {["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"].map((day) => (
                         <TableHead key={day} className="text-center min-w-32">
                           {day}
                         </TableHead>
@@ -960,144 +1042,112 @@ export default function ClassManagement() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {realTimeSlots.map((timeSlot) => (
-                      <TableRow key={timeSlot}>
-                        <TableCell>{timeSlot}</TableCell>
-                        {["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].map((dayKey, colIdx) => {
-                          const dateStr = toDateStr(weekDates[colIdx])
-                          const classesForCell = realSchedule
-                            .filter(r => r.date === dateStr && r.time === timeSlot)
-                            .sort((a,b) => a.group_no - b.group_no)
-                          return (
-                            <TableCell key={dayKey} className="p-2">
-                              {classesForCell.length > 0 ? (
-                                <div className="space-y-2">
-                                  {classesForCell.map((cls) => (
-                                    <div key={cls.class_id} className="p-2 rounded-lg border bg-card cursor-pointer hover:bg-accent/50 hover:shadow-md transition-all duration-200" onClick={() => openManageDialog(cls)}>
-                                      <div className="space-y-1">
-                                        <div className="font-medium text-sm flex items-center gap-2">
-                                          <div className="flex items-center gap-1">
-                                            <span className="hover:text-primary transition-colors">
-                                              {format(new Date(cls.date), 'MM.dd', { locale: ko })}
-                                            </span>
-                                            <span>•</span>
-                                            <span className="hover:text-primary transition-colors">
-                                              {format(new Date(cls.date), 'EEEE', { locale: ko })}
-                                            </span>
-                                            <span>•</span>
-                                            <span className="hover:text-primary transition-colors">
-                                              {cls.time}
-                                            </span>
+                      {realTimeSlots.map((timeSlot) => (
+                        <TableRow key={timeSlot}>
+                          <TableCell>{timeSlot}</TableCell>
+                          {["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].map((dayKey, colIdx) => {
+                            const dateStr = toDateStr(weekDates[colIdx])
+                            const classesForCell = realSchedule
+                              .filter(r => r.date === dateStr && r.time === timeSlot)
+                              .sort((a,b) => a.group_no - b.group_no)
+                            return (
+                              <TableCell key={dayKey} className="p-2">
+                                {classesForCell.length > 0 ? (
+                                  <div className="space-y-2">
+                                    {classesForCell.map((cls) => (
+                                      <div key={cls.class_id} className="p-2 rounded-lg border bg-card cursor-pointer hover:bg-accent/50 hover:shadow-md transition-all duration-200" onClick={() => openClassDetailDialog(cls)}>
+                                        <div className="space-y-1">
+                                          <div className="font-medium text-sm flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                              <span className="hover:text-primary transition-colors">
+                                                {format(new Date(cls.date), 'MM/dd (E)', { locale: ko })}
+                                              </span>
+                                              <span className="hover:text-primary transition-colors">
+                                                {cls.time?.slice(0,5)}
+                                              </span>
+                                            </div>
+                                            <Badge variant="outline" className="text-xs">{cls.students.length}명</Badge>
                                           </div>
-                                          <Badge variant="outline" className="text-xs">{cls.students.length}명</Badge>
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                          그룹 {cls.group_no}
-                                        </div>
-                                        {cls.students.length > 0 ? (
-                                          <div className="text-xs flex flex-wrap gap-x-2 gap-y-1">
-                                            {cls.students.map(s => (
-                                              <span key={s.id} className="inline-flex items-center gap-1">{s.name}</span>
-                                            ))}
-                                          </div>
-                                        ) : (
-                                          <div className="text-xs text-muted-foreground">학생 없음</div>
-                                        )}
-                                        <div className="text-xs text-muted-foreground opacity-0 hover:opacity-100 transition-opacity duration-200">
-                                          클릭하여 학생 관리
+                                          {cls.students.length > 0 ? (
+                                            <div className="text-xs flex flex-col gap-1">
+                                              {cls.students.map(s => (
+                                                <div key={s.id} className="flex items-center gap-2">
+                                                  <span className="font-medium">{s.name}</span>
+                                                  <Badge variant="outline">{s.grade || ''}</Badge>
+                                                  <span 
+                                                    className="inline-block"
+                                                    style={{
+                                                      backgroundColor: 
+                                                        s.level === 'WHITE' ? '#ffffff' :
+                                                        s.level === 'YELLOW' ? '#fde047' :
+                                                        s.level === 'GREEN' ? '#86efac' :
+                                                        s.level === 'BLUE' ? '#93c5fd' :
+                                                        s.level === 'RED' ? '#fca5a5' :
+                                                        s.level === 'BLACK' ? '#374151' :
+                                                        s.level === 'GOLD' ? '#fbbf24' : '#e5e7eb',
+                                                      border: s.level === 'WHITE' ? '1px solid #d1d5db' : 'none',
+                                                      width: '10px',
+                                                      height: '10px',
+                                                    }}
+                                                  />
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <div className="text-xs text-muted-foreground">학생 없음</div>
+                                          )}
                                         </div>
                                       </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="text-muted-foreground text-sm">-</div>
-                              )}
-                            </TableCell>
-                          )
-                        })}
+                              ))}
+                            </div>
+                                ) : (
+                                  <div className="text-muted-foreground text-sm">-</div>
+                                )}
+                          </TableCell>
+                            )
+                          })}
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-4">선택한 주차에 진행 중인 수업이 없습니다.</p>
+                  <Button 
+                    onClick={() => generateAttendanceForWeek(scheduleWeek.start, scheduleWeek.end)}
+                    disabled={isGenerating}
+                    className="bg-primary hover:bg-primary/90"
+                  >
+                    {isGenerating ? "생성 중..." : "출석부 생성"}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="weekly" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>요일별 시간표</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-24">시간</TableHead>
-                      {["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"].map((day) => (
-                        <TableHead key={day} className="text-center min-w-32">
-                          {day}
-                        </TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {realTimeSlots.map((timeSlot) => (
-                      <TableRow key={timeSlot}>
-                        <TableCell>{timeSlot}</TableCell>
-                        {["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map((dayKey, colIdx) => {
-                          const weekday = colIdx === 6 ? 0 : colIdx + 1 // 일요일을 0으로, 월요일을 1로 변환
-                          const classesForCell = realSchedule
-                            .filter(r => {
-                              const date = new Date(r.date)
-                              const dayOfWeek = (date.getDay() + 6) % 7 // 0:월 ~ 6:일로 변환
-                              return dayOfWeek === weekday && r.time === timeSlot
-                            })
-                            .sort((a,b) => a.group_no - b.group_no)
-                          
-                          return (
-                            <TableCell key={dayKey} className="p-2">
-                              {classesForCell.length > 0 ? (
-                                <div className="space-y-2">
-                                  {classesForCell.map((cls) => (
-                                    <div key={cls.class_id} className="p-2 rounded-lg border bg-card">
-                                      <div className="space-y-1">
-                                        <div className="font-medium text-sm flex items-center gap-2">
-                                          <Badge variant="outline" className="text-xs">{cls.students.length}명</Badge>
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                          그룹 {cls.group_no}
-                                        </div>
-                                        {cls.students.length > 0 ? (
-                                          <div className="text-xs flex flex-wrap gap-x-2 gap-y-1">
-                                            {cls.students.map(s => (
-                                              <span key={s.id} className="inline-flex items-center gap-1">{s.name}</span>
-                                            ))}
-                                          </div>
-                                        ) : (
-                                          <div className="text-xs text-muted-foreground">학생 없음</div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="text-muted-foreground text-sm">-</div>
-                              )}
-                            </TableCell>
-                          )
-                        })}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
+
+      {/* 주차별 수업 상세 모달 */}
+      <Dialog open={isClassDetailOpen} onOpenChange={setIsClassDetailOpen}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-auto">
+          {selectedClassForDetail && selectedClassDate && (
+            <ClassDetailCard
+              classItem={selectedClassForDetail as any}
+              selectedDate={selectedClassDate}
+              getStatusOnDate={getStatusOnDate as any}
+              getWeeklyCells={getWeeklyCells as any}
+              getAttendanceDatesForCellByStatus={getAttendanceDatesForCellByStatus as any}
+              toggleAttendanceForSelectedDate={toggleAttendanceForSelectedDate as any}
+              openStudentDetail={openStudentDetail as any}
+              setHoveredCalendarDates={setHoveredCalendarDates as any}
+              toDateObjectsFromMonthDay={toDateObjectsFromMonthDay as any}
+              onClassUpdated={() => loadRealSchedule(scheduleWeek.start, scheduleWeek.end)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* 수업 학생 관리 다이얼로그 */}
       <Dialog open={isManageOpen} onOpenChange={setIsManageOpen}>
