@@ -360,7 +360,7 @@ export default function ClassManagement() {
 
       const { data, error } = await supabase
         .from('classes')
-        .select('id, date, time, group_no, attendance:attendance(student_id, students:students(id, name, birth_date, current_level))')
+        .select('id, date, time, group_no, attendance:attendance(student_id, status, students:students(id, name, birth_date, current_level))')
         .gte('date', startStr)
         .lte('date', endStr)
         .order('date', { ascending: true })
@@ -394,6 +394,27 @@ export default function ClassManagement() {
         }).filter(s => !!s && !!s.id)
       }))
       setRealSchedule(mapped)
+      // DB 출석 상태를 로컬 상태에 반영 (주간 전체)
+      const nextStatusState: Record<number, Record<string, 'present' | 'absent' | 'makeup' | 'makeup_done'>> = {}
+      const mapDbToUi = (s?: string) => (
+        s === '출석' ? 'present'
+        : s === '결석' ? 'absent'
+        : s === '보강예정' ? 'makeup'
+        : s === '보강완료' ? 'makeup_done'
+        : 'none'
+      ) as 'present' | 'absent' | 'makeup' | 'makeup_done' | 'none'
+      ;(data || []).forEach((c: any) => {
+        const key = c.date as string
+        const atts = (c.attendance || []) as any[]
+        atts.forEach(a => {
+          const sid = a.student_id as number
+          const ui = mapDbToUi(a.status)
+          if (ui === 'none') return
+          if (!nextStatusState[sid]) nextStatusState[sid] = {}
+          nextStatusState[sid][key] = ui
+        })
+      })
+      setAttendanceStatus(prev => ({ ...prev, ...nextStatusState }))
       
       // 해당 주차에 출석 데이터가 있는지 확인
       const hasData = mapped.length > 0
@@ -418,7 +439,8 @@ export default function ClassManagement() {
           time, 
           group_no, 
           attendance:attendance(
-            student_id, 
+            student_id,
+            status,
             students:students(
               id, 
               name, 
@@ -474,6 +496,27 @@ export default function ClassManagement() {
       }))
 
       setDailyClasses(mapped)
+      // DB 출석 상태를 로컬 상태에 반영 (해당 날짜)
+      const nextStatusState: Record<number, Record<string, 'present' | 'absent' | 'makeup' | 'makeup_done'>> = {}
+      const mapDbToUi = (s?: string) => (
+        s === '출석' ? 'present'
+        : s === '결석' ? 'absent'
+        : s === '보강예정' ? 'makeup'
+        : s === '보강완료' ? 'makeup_done'
+        : 'none'
+      ) as 'present' | 'absent' | 'makeup' | 'makeup_done' | 'none'
+      ;(data || []).forEach((c: any) => {
+        const key = dateStr
+        const atts = (c.attendance || []) as any[]
+        atts.forEach(a => {
+          const sid = a.student_id as number
+          const ui = mapDbToUi(a.status)
+          if (ui === 'none') return
+          if (!nextStatusState[sid]) nextStatusState[sid] = {}
+          nextStatusState[sid][key] = ui
+        })
+      })
+      setAttendanceStatus(prev => ({ ...prev, ...nextStatusState }))
       
       // 해당 날짜에 출석 데이터가 있는지 확인
       const hasData = mapped.length > 0
@@ -711,20 +754,20 @@ export default function ClassManagement() {
   const isAttendedOnDate = (studentId: number, date: Date) => getStatusOnDate(studentId, date) === 'present'
 
   // 출석 토글 (일별 수업에서 선택된 날짜 기준)
-  const toggleAttendanceForSelectedDate = (studentId: number) => {
+  const toggleAttendanceForSelectedDate = (studentId: number, classId?: number) => {
     const key = getDateKey(selectedDate)
-    let nextStatus: 'present' | 'absent' | 'makeup' | 'makeup_done' | 'none'
-    
+    const current = attendanceStatus[studentId]?.[key] || 'none'
+    // 규칙: makeup_done은 make_up 상태에서만 전환 허용
+    const nextStatus: 'present' | 'absent' | 'makeup' | 'makeup_done' | 'none' =
+      current === 'none' ? 'present'
+      : current === 'present' ? 'absent'
+      : current === 'absent' ? 'makeup'
+      : current === 'makeup' ? 'makeup_done'
+      : current === 'makeup_done' ? 'none'
+      : 'none'
+
     setAttendanceStatus(prev => {
       const mapForStudent = { ...(prev[studentId] || {}) }
-      const current = mapForStudent[key] || 'none'
-      // 순환: none -> present -> absent -> makeup -> makeup_done -> none
-      nextStatus =
-        current === 'none' ? 'present'
-        : current === 'present' ? 'absent'
-        : current === 'absent' ? 'makeup'
-        : current === 'makeup' ? 'makeup_done'
-        : 'none'
       mapForStudent[key] = nextStatus
       return { ...prev, [studentId]: mapForStudent }
     })
@@ -745,6 +788,25 @@ export default function ClassManagement() {
       
       return { ...prev, [studentId]: studentGrid }
     })
+
+    // DB 반영 (optional classId가 전달된 경우만)
+    if (classId) {
+      const mapUiToDb = (s: 'present'|'absent'|'makeup'|'none'|'makeup_done') => (
+        s === 'present' ? '출석'
+        : s === 'absent' ? '결석'
+        : s === 'makeup' ? '보강예정'
+        : '예정'
+      ) as string
+      const dbStatus = mapUiToDb(nextStatus)
+      supabase
+        .from('attendance')
+        .upsert({ student_id: studentId, class_id: classId, status: dbStatus }, { onConflict: 'student_id,class_id' })
+        .then(({ error }) => {
+          if (error) {
+            console.error('출석 상태 저장 실패:', error)
+          }
+        })
+    }
   }
 
   // 이번 달 출석 합계

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
@@ -7,6 +7,9 @@ import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Plus } from "lucide-react"
 import { supabase } from "../lib/supabase"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
+import { format } from "date-fns"
+import { ko } from "date-fns/locale"
 
 type StudentStatus = '재원' | '휴원' | '퇴원'
 
@@ -101,6 +104,7 @@ export default function StudentDetailModal({ isOpen, onClose, studentId }: Stude
   const [levelHistories, setLevelHistories] = useState<LevelHistory[]>([])
   const [attendance, setAttendance] = useState<AttendanceItem[]>([])
   const [payments, setPayments] = useState<PaymentItem[]>([])
+  const [attnYearMonth, setAttnYearMonth] = useState<string>(new Date().toISOString().slice(0,7))
   const [loading, setLoading] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
@@ -187,6 +191,12 @@ export default function StudentDetailModal({ isOpen, onClose, studentId }: Stude
         .eq('student_id', id)
         .order('created_at', { ascending: false })
       setAttendance((attData as AttendanceItem[]) || [])
+      // 초기 출석 월 설정 (가장 최근 기록 기준)
+      const recent = (attData as AttendanceItem[] | null) || []
+      if (recent.length > 0) {
+        const d = recent.find(a => a.classes?.date)?.classes?.date
+        if (d) setAttnYearMonth(d.slice(0,7))
+      }
     } catch (e) {
       console.error('Error loading student detail modal:', e)
     } finally {
@@ -207,7 +217,7 @@ export default function StudentDetailModal({ isOpen, onClose, studentId }: Stude
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-3xl w-[95vw] max-h-[90vh] p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-3xl w-[95vw] max-h-[90vh] p-0 overflow-y-auto">
         <DialogHeader className="pb-3">
           <DialogTitle className="text-lg">학생 상세 정보</DialogTitle>
         </DialogHeader>
@@ -215,7 +225,7 @@ export default function StudentDetailModal({ isOpen, onClose, studentId }: Stude
           <div className="p-6 text-center text-muted-foreground">불러오는 중...</div>
         ) : student ? (
           <div className="h-[76vh] flex flex-col min-h-0">
-            <div className="flex-1 overflow-y-auto pr-4 pl-4 pb-4 space-y-4">
+            <div className="p-4 space-y-4">
               <div className="flex-shrink-0 flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border">
                 <div>
                   <div className="text-xl font-bold text-gray-900">{student.name}</div>
@@ -308,42 +318,49 @@ export default function StudentDetailModal({ isOpen, onClose, studentId }: Stude
 
               <Card className="shrink-0">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">이번달 출석 현황</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm">출석 현황</CardTitle>
+                    {attendance.length > 0 && (
+                      <div className="w-40">
+                        <Select value={attnYearMonth} onValueChange={setAttnYearMonth}>
+                          <SelectTrigger className="h-8">
+                            <SelectValue placeholder="연-월 선택" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from({ length: 18 }).map((_, idx) => {
+                              const d = new Date()
+                              d.setMonth(d.getMonth() - idx)
+                              const ym = d.toISOString().slice(0,7)
+                              const label = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+                              return <SelectItem key={ym} value={ym}>{label}</SelectItem>
+                            })}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="font-medium">출석일:</span>{' '}
-                      {attendance
-                        .filter(a => a.status === '출석')
-                        .map(a => a.classes?.date)
-                        .filter(Boolean)
-                        .join(', ') || '없음'}
-                    </div>
-                    <div>
-                      <span className="font-medium">결석일:</span>{' '}
-                      {attendance
-                        .filter(a => a.status === '결석')
-                        .map(a => a.classes?.date)
-                        .filter(Boolean)
-                        .join(', ') || '없음'}
-                    </div>
-                    <div>
-                      <span className="font-medium">보강완료:</span>{' '}
-                      {attendance
-                        .filter(a => a.status === '보강완료')
-                        .map(a => a.classes?.date)
-                        .filter(Boolean)
-                        .join(', ') || '없음'}
-                    </div>
-                    <div>
-                      <span className="font-medium">보강예정:</span>{' '}
-                      {attendance
-                        .filter(a => a.status === '보강예정')
-                        .map(a => a.classes?.date)
-                        .filter(Boolean)
-                        .join(', ') || '없음'}
-                    </div>
+                  <div className="space-y-1 text-sm">
+                    {(() => {
+                      const items = (attendance || [])
+                        .filter(a => a.classes?.date && a.classes.date.startsWith(attnYearMonth))
+                        .map(a => ({ date: a.classes!.date as string, status: a.status || 'none' }))
+                        .sort((a,b) => a.date.localeCompare(b.date))
+                      if (items.length === 0) return <div className="text-muted-foreground text-xs">기록 없음</div>
+                      return (
+                        <div className="grid grid-cols-1 gap-1">
+                          {items.map((it, i) => (
+                            <div key={`${it.date}-${i}`} className="flex items-center justify-between px-2 py-1 rounded hover:bg-accent/40">
+                              <span className="tabular-nums">{format(new Date(it.date), 'MM/dd (E)', { locale: ko })}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {it.status || 'none'}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })()}
                   </div>
                 </CardContent>
               </Card>

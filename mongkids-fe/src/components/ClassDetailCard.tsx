@@ -33,7 +33,7 @@ interface DailyClassCardProps {
     makeup_done: string[]
   }
   // getMonthlyAttendanceCount 제거 (사용 안 함)
-  toggleAttendanceForSelectedDate: (studentId: number) => void
+  toggleAttendanceForSelectedDate: (studentId: number, classId?: number) => void
   openStudentDetail: (studentId: number) => void
   setHoveredCalendarDates: (dates: {present: Date[]; absent: Date[]; makeup: Date[]; makeup_done: Date[]}) => void
   toDateObjectsFromMonthDay: (baseDate: Date, monthDayList: string[]) => Date[]
@@ -292,22 +292,22 @@ export default function DailyClassCard({
               <div 
                 key={student.id} 
                 className="flex items-center justify-between p-2 rounded border cursor-pointer hover:bg-accent/50 transition-colors"
-                onClick={() => toggleAttendanceForSelectedDate(student.id)}
+                onClick={() => toggleAttendanceForSelectedDate(student.id, classItem.class_id)}
                 style={{
                   backgroundColor: (() => {
                     const s = getStatusOnDate(student.id, selectedDate)
-                    if (s === 'present') return '#dcfce7' // 연한 초록
-                    if (s === 'absent') return '#f3f4f6' // 연한 회색
-                    if (s === 'makeup') return '#fefce8' // 연한 노랑
-                    if (s === 'makeup_done') return '#dcfce7' // present와 동일
+                    if (s === 'present') return '#dcfce7'
+                    if (s === 'absent') return '#f3f4f6'
+                    if (s === 'makeup') return '#fefce8'
+                    if (s === 'makeup_done') return '#e0f2fe'
                     return 'transparent'
                   })(),
                   borderColor: (() => {
                     const s = getStatusOnDate(student.id, selectedDate)
-                    if (s === 'present') return '#22c55e' // 초록
-                    if (s === 'absent') return '#9ca3af' // 회색
-                    if (s === 'makeup') return '#eab308' // 노랑
-                    if (s === 'makeup_done') return '#22c55e' // present와 동일
+                    if (s === 'present') return '#22c55e'
+                    if (s === 'absent') return '#9ca3af'
+                    if (s === 'makeup') return '#eab308'
+                    if (s === 'makeup_done') return '#38bdf8'
                     return '#e5e7eb'
                   })()
                 }}
@@ -359,7 +359,7 @@ export default function DailyClassCard({
                             })(),
                             borderColor: '#d1d5db'
                           }}
-                          onClick={(e) => { e.stopPropagation(); toggleAttendanceForSelectedDate(student.id) }}
+                          onClick={(e) => { e.stopPropagation(); toggleAttendanceForSelectedDate(student.id, classItem.class_id) }}
                           onMouseEnter={() => {
                             const { present, absent, makeup, makeup_done } = getAttendanceDatesForCellByStatus(student.id, selectedDate, idx)
                             setHoveredCalendarDates({
