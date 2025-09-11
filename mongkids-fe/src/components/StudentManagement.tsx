@@ -996,8 +996,8 @@ export default function StudentManagement() {
         <p className="text-muted-foreground">학생 정보를 관리합니다.</p>
       </div>
 
-      <Card>
-        <CardHeader>
+          <Card>
+            <CardHeader>
           <div className="flex items-center justify-between gap-2">
             <CardTitle>학생 목록 ({getStatusFilterCount()}명)</CardTitle>
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
@@ -1257,27 +1257,27 @@ export default function StudentManagement() {
                 </select>
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>이름</TableHead>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>이름</TableHead>
                   <TableHead>성별</TableHead>
                   <TableHead>학년</TableHead>
                   <TableHead>현재 레벨</TableHead>
                   <TableHead>등록반</TableHead>
                   <TableHead>수업시간</TableHead>
-                  <TableHead>전화번호</TableHead>
+                      <TableHead>전화번호</TableHead>
                   <TableHead>
                     {monthFilter === 'all' ? '최근결제일' : `${monthFilter.split('-')[0]}년 ${monthFilter.split('-')[1]}월`}
                   </TableHead>
                   <TableHead>결제금액</TableHead>
                   <TableHead>상태</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={10} className="text-center text-muted-foreground">
@@ -1332,7 +1332,7 @@ export default function StudentManagement() {
                               return hasPaymentInMonth ? (
                                 <Badge className="bg-green-100 text-green-800 border-green-300">
                                   결제완료
-                                </Badge>
+                          </Badge>
                               ) : (
                                 <Badge className="bg-red-100 text-red-800 border-red-300">
                                   미결제
@@ -1405,11 +1405,11 @@ export default function StudentManagement() {
                     </TableCell>
                   </TableRow>
                 )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
 
       <StudentDetailModal
         isOpen={isDetailOpen}
@@ -1419,11 +1419,11 @@ export default function StudentManagement() {
 
       {/* 삭제 확인 다이얼로그 */}
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
+              <DialogContent>
+                <DialogHeader>
             <DialogTitle>학생 삭제 확인</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
+                </DialogHeader>
+                <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               정말로 <strong>{selectedStudent?.name}</strong> 학생을 삭제하시겠습니까?
             </p>
@@ -1449,10 +1449,10 @@ export default function StudentManagement() {
               >
                 삭제
               </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
 
       {/* 학생 수정 다이얼로그 */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
@@ -1477,7 +1477,7 @@ export default function StudentManagement() {
               {!editStudent.name && (
                 <p className="text-xs text-red-500">이름을 입력해주세요</p>
               )}
-            </div>
+                          </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">성별</label>
               <select 
@@ -1545,7 +1545,7 @@ export default function StudentManagement() {
               {!editStudent.class_type_id && (
                 <p className="text-xs text-red-500">등록반을 선택해주세요</p>
               )}
-            </div>
+              </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">현재 레벨</label>
               <select 
@@ -1628,7 +1628,7 @@ export default function StudentManagement() {
               }
             >
               수정
-            </Button>
+                </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -1636,10 +1636,10 @@ export default function StudentManagement() {
       {/* 레벨 이력 수정 다이얼로그 */}
       <Dialog open={isLevelEditOpen} onOpenChange={setIsLevelEditOpen}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader>
+                <DialogHeader>
             <DialogTitle>레벨 이력 수정 - {selectedStudent?.name}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
+                </DialogHeader>
+                <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               각 레벨의 취득 날짜를 입력하세요. 빈 값으로 두면 해당 레벨을 취득하지 않은 것으로 처리됩니다.
             </p>
@@ -1697,23 +1697,23 @@ export default function StudentManagement() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+                  <div>
                 <label className="text-sm text-muted-foreground">결제일</label>
                 <Input
                   type="date"
                   value={newPayment.payment_date}
                   onChange={(e) => setNewPayment(prev => ({ ...prev, payment_date: e.target.value }))}
                 />
-              </div>
-              <div>
+                  </div>
+                  <div>
                 <label className="text-sm text-muted-foreground">해당월</label>
                 <Input
                   type="month"
                   value={newPayment.payment_month}
                   onChange={(e) => setNewPayment(prev => ({ ...prev, payment_month: e.target.value }))}
                 />
-              </div>
-              <div>
+                  </div>
+                  <div>
                 <label className="text-sm text-muted-foreground">결제 금액(정가)</label>
                 <Input
                   type="number"
@@ -1721,8 +1721,8 @@ export default function StudentManagement() {
                   value={newPayment.total_amount}
                   onChange={(e) => setNewPayment(prev => ({ ...prev, total_amount: e.target.value }))}
                 />
-              </div>
-              <div>
+                  </div>
+                  <div>
                 <label className="text-sm text-muted-foreground">결제수단</label>
                 <select
                   value={newPayment.payment_method}
@@ -1733,7 +1733,7 @@ export default function StudentManagement() {
                   <option value="card">카드결제</option>
                   <option value="voucher">체육바우처</option>
                 </select>
-              </div>
+                  </div>
               <div>
                 <label className="text-sm text-muted-foreground">신발 할인</label>
                 <Input
@@ -1742,7 +1742,7 @@ export default function StudentManagement() {
                   value={newPayment.shoe_discount}
                   onChange={(e) => setNewPayment(prev => ({ ...prev, shoe_discount: e.target.value }))}
                 />
-              </div>
+                </div>
               <div>
                 <label className="text-sm text-muted-foreground">형제자매 할인</label>
                 <Input
@@ -1761,8 +1761,8 @@ export default function StudentManagement() {
                   onChange={(e) => setNewPayment(prev => ({ ...prev, additional_discount: e.target.value }))}
                 />
               </div>
-            </div>
-            
+          </div>
+
             {/* 계산 결과 표시 */}
             <div className="p-3 rounded-md border bg-muted/30 text-sm">
               <div className="flex justify-between">
@@ -1804,7 +1804,7 @@ export default function StudentManagement() {
               >
                 추가
               </Button>
-            </div>
+              </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -1117,6 +1117,7 @@ export default function ClassManagement() {
                         }}
                         getAttendanceRecord={(studentId) => getAttendanceRecord(studentId, selectedDate, classItem.class_id) as any}
                         updateAttendanceNote={updateAttendanceNote as any}
+                        onClassUpdated={() => loadDailyClasses(selectedDate)}
                       />
                     ))}
                 </div>
@@ -1214,7 +1215,7 @@ export default function ClassManagement() {
                                   <div className="space-y-2">
                                     {classesForCell.map((cls) => (
                                       <div key={cls.class_id} className="p-2 rounded-lg border bg-card cursor-pointer hover:bg-accent/50 hover:shadow-md transition-all duration-200" onClick={() => openClassDetailDialog(cls)}>
-                                        <div className="space-y-1">
+                            <div className="space-y-1">
                                           <div className="font-medium text-sm flex items-center justify-between">
                                             <div className="flex items-center gap-2">
                                               <span className="hover:text-primary transition-colors">
@@ -1223,9 +1224,9 @@ export default function ClassManagement() {
                                               <span className="hover:text-primary transition-colors">
                                                 {cls.time?.slice(0,5)}
                                               </span>
-                                            </div>
+                                    </div>
                                             <Badge variant="outline" className="text-xs">{cls.students.length}명</Badge>
-                                          </div>
+                                  </div>
                                           {cls.students.length > 0 ? (
                                             <div className="text-xs flex flex-col gap-1">
                                               {cls.students.map(s => (
@@ -1233,9 +1234,9 @@ export default function ClassManagement() {
                                                   <span className="font-medium">{s.name}</span>
                                                   <Badge variant="outline">{s.grade || ''}</Badge>
                                                   <LevelBadge level={s.level as any} size={10} radius={2} />
-                                                </div>
-                                              ))}
-                                            </div>
+                                </div>
+                              ))}
+                            </div>
                                           ) : (
                                             <div className="text-xs text-muted-foreground">학생 없음</div>
                                           )}

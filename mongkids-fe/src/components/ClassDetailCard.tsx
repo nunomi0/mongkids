@@ -7,8 +7,9 @@ import { format } from "date-fns"
 import { ko } from "date-fns/locale"
 import { supabase } from "../lib/supabase"
 import LevelBadge from "./LevelBadge"
+import MemoEditor from "./MemoEditor"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog"
-import { Plus } from "lucide-react"
+import { Plus, MoreHorizontal, Trash2 } from "lucide-react"
 
 interface Student {
   id: number
@@ -76,6 +77,8 @@ export default function DailyClassCard({
     schedules: { weekday: number; time: string; group_no: number }[]
   }[]>([])
   const [isAddOpen, setIsAddOpen] = useState(false)
+  const [isRemoveOpen, setIsRemoveOpen] = useState(false)
+  const [isActionsOpen, setIsActionsOpen] = useState(false)
   const [isLinkOpen, setIsLinkOpen] = useState(false)
   const [pendingAddStudentId, setPendingAddStudentId] = useState<number | null>(null)
   const [sourceAttendances, setSourceAttendances] = useState<Array<{ id: number; status: '예정'|'출석'|'결석'; date: string; time: string; group_no: number }>>([])
@@ -83,6 +86,7 @@ export default function DailyClassCard({
   const [linkMonth, setLinkMonth] = useState<string>(new Date().toISOString().slice(0,7))
   const [monthOptions, setMonthOptions] = useState<Array<{ value: string; label: string }>>([])
   const [makeupNote, setMakeupNote] = useState<string>("")
+  const [pendingAddStudentName, setPendingAddStudentName] = useState<string>("")
   const [memoOpen, setMemoOpen] = useState(false)
   const [memoStudentId, setMemoStudentId] = useState<number | null>(null)
   const [memoDraft, setMemoDraft] = useState<string>("")
@@ -246,6 +250,7 @@ export default function DailyClassCard({
       setStudentSearch("")
       setSearchResults([])
       setMakeupNote("")
+      // 즉시 반영: 상위 갱신 콜백 호출
       onClassUpdated && onClassUpdated()
     } catch (e) {
       console.error('보강 편성 실패:', e)
@@ -262,13 +267,36 @@ export default function DailyClassCard({
             <span>{format(selectedDate, '(E)', { locale: ko })}</span>
             <span>{toHm(classItem.time)}</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 relative">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 px-2"
+              onClick={(e)=>{ e.stopPropagation(); setIsActionsOpen(v=>!v) }}
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </Button>
+            {isActionsOpen && (
+              <div className="absolute right-0 top-full mt-1 z-[10000] rounded-md border bg-popover text-popover-foreground shadow-md">
+                <div className="flex flex-col p-1 min-w-[140px]">
+                  <button
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 rounded whitespace-nowrap cursor-pointer"
+                    onClick={(e)=>{ e.stopPropagation(); setIsActionsOpen(false); setIsAddOpen(true) }}
+                  >
+                    학생 추가
+                  </button>
+                  <button
+                    className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-accent/50 rounded whitespace-nowrap cursor-pointer"
+                    onClick={(e)=>{ e.stopPropagation(); setIsActionsOpen(false); setIsRemoveOpen(true) }}
+                  >
+                    학생 삭제
+                  </button>
+                </div>
+              </div>
+            )}
+
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" variant="outline" className="h-8 px-2">
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </DialogTrigger>
               <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>학생 추가</DialogTitle>
@@ -276,9 +304,10 @@ export default function DailyClassCard({
                 <div className="space-y-3">
                   <Input
                     autoFocus
-                    placeholder="학생 이름으로 검색..."
+                    placeholder="학생 이름으로 검색"
                     value={studentSearch}
                     onChange={(e) => setStudentSearch(e.target.value)}
+                    style={{ marginBottom: '12px' }}
                   />
                   <div className="border rounded-md max-h-80 overflow-y-auto">
                     <table className="w-full text-sm">
@@ -363,6 +392,45 @@ export default function DailyClassCard({
                       </tbody>
                     </table>
                   </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={isRemoveOpen} onOpenChange={setIsRemoveOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>학생 삭제</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {studentsToRender.length > 0 ? studentsToRender.map(s => (
+                    <div key={s.id} className="flex items-center justify-between p-2 border rounded">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{s.name}</span>
+                        <Badge variant="outline">{s.grade}</Badge>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-red-600 hover:bg-red-50"
+                        onClick={async ()=>{
+                          try {
+                            const { error } = await supabase
+                              .from('attendance')
+                              .delete()
+                              .eq('student_id', s.id)
+                              .eq('class_id', classItem.class_id)
+                            if (error) throw error
+                            onClassUpdated && onClassUpdated()
+                          } catch (e) {
+                            console.error('학생 삭제 실패:', e)
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" /> 삭제
+                      </Button>
+                    </div>
+                  )) : (
+                    <div className="text-sm text-muted-foreground">삭제할 학생이 없습니다.</div>
+                  )}
                 </div>
               </DialogContent>
             </Dialog>
@@ -469,70 +537,25 @@ export default function DailyClassCard({
                       ))}
                     </div>
                     {(() => {
+                      const meta = `${format(selectedDate, 'yyyy-MM-dd (E)', { locale: ko })} ${toHm(classItem.time)} - ${student.name} 메모`
                       const rec = getAttendanceRecord ? getAttendanceRecord(student.id) : undefined
                       const note = rec?.note || ''
                       const hasNote = !!note
                       return (
-                        <button
-                          className="ml-2 text-xs px-1.5 py-0.5 rounded hover:bg-accent/40 cursor-pointer"
-                          style={{ color: hasNote ? '#111827' : '#9ca3af' }}
-                          title={hasNote ? note : '메모 없음'}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setMemoStudentId(student.id)
-                            setMemoDraft(note)
-                            setMemoOpen(true)
-                          }}
-                          aria-label="메모 편집"
-                        >
-                          ✎
-                        </button>
+                        <MemoEditor
+                          studentId={student.id}
+                          classId={classItem.class_id}
+                          hasNote={hasNote}
+                          note={note}
+                          meta={meta}
+                          className="ml-2"
+                        />
                       )
                     })()}
                   </div>
                 </div>
               </div>
-              {/* 메모 편집 모달 - 학생별 */}
-              <Dialog open={memoOpen && memoStudentId === student.id} onOpenChange={(o)=>{ if(!o){ setMemoOpen(false); setMemoStudentId(null)} }}>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>
-                      메모 {studentsToRender.find(s=>s.id===student.id)?.name ? `- ${studentsToRender.find(s=>s.id===student.id)!.name}` : ''}
-                    </DialogTitle>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {format(selectedDate, 'yyyy-MM-dd (E)', { locale: ko })} · {toHm(classItem.time)} · 그룹 {classItem.group_no}
-                    </div>
-                  </DialogHeader>
-                  <div className="space-y-3">
-                    <textarea
-                      className="w-full border rounded p-2 text-sm min-h-[120px]"
-                      value={memoDraft}
-                      onChange={(e)=>setMemoDraft(e.target.value)}
-                      onKeyDown={async (e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault()
-                          const rec = getAttendanceRecord ? getAttendanceRecord(student.id) : undefined
-                          if (rec?.id && updateAttendanceNote) {
-                            await updateAttendanceNote(rec.id, memoDraft.trim()===''? null : memoDraft)
-                          }
-                          setMemoOpen(false); setMemoStudentId(null)
-                        }
-                      }}
-                      placeholder="메모를 입력하세요"
-                    />
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" onClick={()=>{ setMemoOpen(false); setMemoStudentId(null)}}>취소</Button>
-                      <Button onClick={async()=>{
-                        const rec = getAttendanceRecord ? getAttendanceRecord(student.id) : undefined
-                        if (rec?.id && updateAttendanceNote) {
-                          await updateAttendanceNote(rec.id, memoDraft.trim()===''? null : memoDraft)
-                        }
-                        setMemoOpen(false); setMemoStudentId(null)
-                      }}>저장</Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
+              {/* 메모 편집은 MemoEditor로 처리 */}
               </React.Fragment>
             ))}
           </div>
@@ -581,31 +604,34 @@ export default function DailyClassCard({
                     <th className="text-left p-2">시간</th>
                     <th className="text-left p-2">그룹</th>
                     <th className="text-left p-2">상태</th>
-                    <th className="text-right p-2">선택</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sourceAttendances.length > 0 ? sourceAttendances.map(a => (
-                    <tr key={a.id} className="border-t">
+                    <tr key={a.id} className={`border-t cursor-pointer ${selectedSourceId === a.id ? 'bg-gray-100' : 'bg-gray-50'}`} onClick={()=> setSelectedSourceId(a.id)}>
                       <td className="p-2 whitespace-nowrap">{format(new Date(a.date), 'yyyy-MM-dd', { locale: ko })}</td>
                       <td className="p-2 whitespace-nowrap">{a.time?.slice(0,5)}</td>
                       <td className="p-2 whitespace-nowrap">{a.group_no}</td>
                       <td className="p-2 whitespace-nowrap">{a.status}</td>
-                      <td className="p-2 whitespace-nowrap text-right">
-                        <input type="radio" name="sourceAtt" checked={selectedSourceId === a.id} onChange={() => setSelectedSourceId(a.id)} />
-                      </td>
                     </tr>
                   )) : (
                     <tr>
-                      <td colSpan={5} className="p-4 text-center text-muted-foreground">선택 가능한 정규 수업이 없습니다</td>
+                      <td colSpan={4} className="p-4 text-center text-muted-foreground">선택 가능한 정규 수업이 없습니다</td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
-            <div className="mt-3">
-              <label className="block text-xs text-muted-foreground mb-1">메모</label>
-              <Input value={makeupNote} onChange={(e)=>setMakeupNote(e.target.value)} placeholder="메모를 입력하세요" />
+            <div className="text-sm mt-3">
+              {selectedSourceId ? (() => {
+                const reg = sourceAttendances.find(x => x.id === selectedSourceId)
+                if (!reg) return null
+                const src = `${format(new Date(reg.date), 'yyyy-MM-dd (E)', { locale: ko })} ${reg.time?.slice(0,5)}`
+                const dst = `${format(selectedDate, 'yyyy-MM-dd (E)', { locale: ko })} ${toHm(classItem.time)}`
+                return <div className="p-2">{`${src} 에서 ${dst} 으로 편성합니다.`}</div>
+              })() : (
+                <div className="text-muted-foreground">편성할 정규 수업을 선택하세요.</div>
+              )}
             </div>
             <div className="flex justify-end gap-2 mt-3">
               <Button onClick={confirmAddMakeup} disabled={!selectedSourceId}>보강으로 편성</Button>

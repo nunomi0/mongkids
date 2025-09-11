@@ -8,6 +8,7 @@ import { Input } from "./ui/input"
 import { Plus } from "lucide-react"
 import { supabase } from "../lib/supabase"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
+import MemoEditor from "./MemoEditor"
 import { format } from "date-fns"
 import LevelBadge from "./LevelBadge"
 import { ko } from "date-fns/locale"
@@ -111,7 +112,6 @@ export default function StudentDetailModal({ isOpen, onClose, studentId }: Stude
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [deleteConfirmName, setDeleteConfirmName] = useState("")
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
-  const [editingMemoId, setEditingMemoId] = useState<number | null>(null)
   const [editStudent, setEditStudent] = useState<{ name: string; birth_date: string; phone: string; shoe_size: string; status: StudentStatus; class_type_id: string; current_level: '' | 'WHITE' | 'YELLOW' | 'GREEN' | 'BLUE' | 'RED' | 'BLACK' | 'GOLD' | 'NONE' } | null>(null)
   const [newPayment, setNewPayment] = useState<{ payment_date: string; payment_month: string; total_amount: string; payment_method: string; shoe_discount: string; sibling_discount: string; additional_discount: string }>({
     payment_date: new Date().toISOString().slice(0, 10),
@@ -317,7 +317,6 @@ export default function StudentDetailModal({ isOpen, onClose, studentId }: Stude
                           <th className="text-left p-2">구분</th>
                           <th className="text-left p-2">상태</th>
                           <th className="text-left p-2">메모</th>
-                          <th className="text-right p-2">액션</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -338,41 +337,28 @@ export default function StudentDetailModal({ isOpen, onClose, studentId }: Stude
                                   {['예정','출석','결석'].map(s => <option key={s} value={s}>{s}</option>)}
                                 </select>
                               </td>
-                              <td className="p-2" title={a.note || ''}>
-                                {editingMemoId === a.id ? (
-                                  <Input
-                                    autoFocus
-                                    value={a.note || ''}
-                                    onChange={(e)=> setAttendance(prev => prev.map(x => x.id === a.id ? { ...x, note: e.target.value } : x))}
-                                    placeholder="메모"
-                                  />
-                                ) : (
-                                  <div className="text-ellipsis overflow-hidden whitespace-nowrap max-w-[180px]">
+                              <td className="p-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="text-ellipsis overflow-hidden whitespace-nowrap max-w-[180px]" title={a.note || ''}>
                                     {a.note || <span className="text-muted-foreground">-</span>}
                                   </div>
-                                )}
+                                  <MemoEditor
+                                    hasNote={!!a.note}
+                                    note={a.note || ''}
+                                    label={`${student?.name || ''} 메모`}
+                                    meta={`${a.classes?.date ? format(new Date(a.classes.date), 'yyyy-MM-dd (E)', { locale: ko }) : ''}${a.classes?.time ? ' ' + (a.classes.time as string).slice(0,5) : ''}`}
+                                    onSave={async (next) => {
+                                      try {
+                                        await supabase.from('attendance').update({ note: next }).eq('id', a.id)
+                                        setAttendance(prev => prev.map(x => x.id === a.id ? { ...x, note: next || null } : x))
+                                      } catch (e) {
+                                        console.error('메모 업데이트 실패:', e)
+                                      }
+                                    }}
+                                  />
+                                </div>
                               </td>
-                              <td className="p-2 text-right">
-                                {editingMemoId === a.id ? (
-                                  <div className="flex items-center justify-end gap-2">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={async()=>{
-                                        try {
-                                          await supabase.from('attendance').update({ status: a.status, note: a.note ?? null }).eq('id', a.id)
-                                          setEditingMemoId(null)
-                                        } catch (e) {
-                                          console.error('출석 업데이트 실패:', e)
-                                        }
-                                      }}
-                                    >저장</Button>
-                                    <Button size="sm" variant="outline" onClick={()=> setEditingMemoId(null)}>취소</Button>
-                                  </div>
-                                ) : (
-                                  <Button size="sm" variant="outline" onClick={()=> setEditingMemoId(a.id)}>편집</Button>
-                                )}
-                              </td>
+                              
                             </tr>
                           ))}
                         {attendance.filter(a => a.classes?.date && (a.classes!.date as string).startsWith(attnYearMonth)).length === 0 && (
@@ -655,5 +641,6 @@ export default function StudentDetailModal({ isOpen, onClose, studentId }: Stude
 // 정보 수정
 // 간단 버전: 핵심 필드만 업데이트
 export function StudentDetailModalDialogs() { return null }
+
 
 
