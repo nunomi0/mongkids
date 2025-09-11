@@ -7,7 +7,7 @@ import { Search, Edit, Trash2, Users, UserX, Clock, Plus } from "lucide-react"
 import { Button } from "./ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog"
 import { supabase } from "../lib/supabase"
-import StudentDetailModal from "./StudentDetailModal"
+import StudentDetailModal from "./student-detail/StudentDetailModal"
 import { getGradeLabel } from "../utils/grade"
 import LevelBadge from "./LevelBadge"
 // 로컬 타입 정의 (supabase.ts의 api 의존 제거)
