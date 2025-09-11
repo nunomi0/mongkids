@@ -6,6 +6,7 @@ import { Input } from "./ui/input"
 import { format } from "date-fns"
 import { ko } from "date-fns/locale"
 import { supabase } from "../lib/supabase"
+import LevelBadge from "./LevelBadge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog"
 import { Plus } from "lucide-react"
 
@@ -323,24 +324,7 @@ export default function DailyClassCard({
                     {student.name}
                   </span>
                   <Badge variant="outline">{student.grade}</Badge>
-                  <div 
-                    style={{
-                      backgroundColor: 
-                        student.level === 'NONE' ? '#e5e7eb' :
-                        student.level === 'WHITE' ? '#ffffff' :
-                        student.level === 'YELLOW' ? '#fde047' :
-                        student.level === 'GREEN' ? '#86efac' :
-                        student.level === 'BLUE' ? '#93c5fd' :
-                        student.level === 'RED' ? '#fca5a5' :
-                        student.level === 'BLACK' ? '#374151' :
-                        student.level === 'GOLD' ? '#fbbf24' : '#e5e7eb',
-                      border: student.level === 'WHITE' ? '1px solid #d1d5db' : 'none',
-                      width: '12px',
-                      height: '12px',
-                      borderRadius: '2px',
-                      display: 'inline-block'
-                    }}
-                  />
+                  <LevelBadge level={student.level as any} />
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <div className="flex items-center gap-2">

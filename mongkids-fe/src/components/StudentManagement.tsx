@@ -8,6 +8,7 @@ import { Button } from "./ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog"
 import { supabase } from "../lib/supabase"
 import StudentDetailModal from "./StudentDetailModal"
+import LevelBadge from "./LevelBadge"
 // 로컬 타입 정의 (supabase.ts의 api 의존 제거)
 type LevelType = 'WHITE' | 'YELLOW' | 'GREEN' | 'BLUE' | 'RED' | 'BLACK' | 'GOLD' | null
 type Student = {
@@ -1295,28 +1296,7 @@ export default function StudentManagement() {
                         <TableCell>{student.gender}</TableCell>
                         <TableCell>{getGrade(student.birth_date)}</TableCell>
                         <TableCell>
-                          {student.current_level ? (
-                            <div 
-                              style={{
-                                backgroundColor: 
-                                  student.current_level === 'NONE' ? '#e5e7eb' :
-                                  student.current_level === 'WHITE' ? '#ffffff' :
-                                  student.current_level === 'YELLOW' ? '#fde047' :
-                                  student.current_level === 'GREEN' ? '#86efac' :
-                                  student.current_level === 'BLUE' ? '#93c5fd' :
-                                  student.current_level === 'RED' ? '#fca5a5' :
-                                  student.current_level === 'BLACK' ? '#374151' :
-                                  student.current_level === 'GOLD' ? '#fbbf24' : '#e5e7eb',
-                                border: student.current_level === 'WHITE' ? '1px solid #d1d5db' : 'none',
-                                width: '12px',
-                                height: '12px',
-                                borderRadius: '2px',
-                                display: 'inline-block'
-                              }}
-                            />
-                          ) : (
-                            "-"
-                          )}
+                          {student.current_level ? <LevelBadge level={student.current_level as any} /> : "-"}
                         </TableCell>
                         <TableCell>{getClassTypeName(student.class_type_id)}</TableCell>
                         <TableCell className="font-mono text-sm">{getClassScheduleText(student.schedules)}</TableCell>

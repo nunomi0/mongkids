@@ -17,6 +17,7 @@ import { supabase } from "../lib/supabase"
 import { Input } from "./ui/input"
 import StudentDetailModal from "./StudentDetailModal"
 import ClassDetailCard from "./ClassDetailCard"
+import LevelBadge from "./LevelBadge"
 
 
 
@@ -1136,22 +1137,7 @@ export default function ClassManagement() {
                                                 <div key={s.id} className="flex items-center gap-2">
                                                   <span className="font-medium">{s.name}</span>
                                                   <Badge variant="outline">{s.grade || ''}</Badge>
-                                                  <span 
-                                                    className="inline-block"
-                                                    style={{
-                                                      backgroundColor: 
-                                                        s.level === 'WHITE' ? '#ffffff' :
-                                                        s.level === 'YELLOW' ? '#fde047' :
-                                                        s.level === 'GREEN' ? '#86efac' :
-                                                        s.level === 'BLUE' ? '#93c5fd' :
-                                                        s.level === 'RED' ? '#fca5a5' :
-                                                        s.level === 'BLACK' ? '#374151' :
-                                                        s.level === 'GOLD' ? '#fbbf24' : '#e5e7eb',
-                                                      border: s.level === 'WHITE' ? '1px solid #d1d5db' : 'none',
-                                                      width: '10px',
-                                                      height: '10px',
-                                                    }}
-                                                  />
+                                                  <LevelBadge level={s.level as any} size={10} radius={2} />
                                                 </div>
                                               ))}
                                             </div>

@@ -9,6 +9,7 @@ import { Plus } from "lucide-react"
 import { supabase } from "../lib/supabase"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
 import { format } from "date-fns"
+import LevelBadge from "./LevelBadge"
 import { ko } from "date-fns/locale"
 
 type StudentStatus = '재원' | '휴원' | '퇴원'
@@ -248,24 +249,7 @@ export default function StudentDetailModal({ isOpen, onClose, studentId }: Stude
                   {student.current_level && (
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-600">현재 레벨:</span>
-                      <div
-                        style={{
-                          backgroundColor:
-                            student.current_level === 'NONE' ? '#e5e7eb' :
-                            student.current_level === 'WHITE' ? '#ffffff' :
-                            student.current_level === 'YELLOW' ? '#fde047' :
-                            student.current_level === 'GREEN' ? '#86efac' :
-                            student.current_level === 'BLUE' ? '#93c5fd' :
-                            student.current_level === 'RED' ? '#fca5a5' :
-                            student.current_level === 'BLACK' ? '#374151' :
-                            student.current_level === 'GOLD' ? '#fbbf24' : '#e5e7eb',
-                          border: student.current_level === 'WHITE' ? '1px solid #d1d5db' : 'none',
-                          width: '18px',
-                          height: '18px',
-                          borderRadius: '3px',
-                          display: 'inline-block',
-                        }}
-                      />
+                      <LevelBadge level={student.current_level as any} size={18} radius={3} />
                     </div>
                   )}
                   <Badge className={`text-sm px-3 py-1 ${getStatusColor(student.status)}`}>{student.status}</Badge>
@@ -287,24 +271,7 @@ export default function StudentDetailModal({ isOpen, onClose, studentId }: Stude
                       const levelHistory = levelHistories.find(l => l.level === level)
                       return (
                         <div key={level} className="flex flex-col items-center">
-                          <div
-                            style={{
-                              backgroundColor:
-                                level === 'NONE' ? '#e5e7eb' :
-                                level === 'WHITE' ? '#ffffff' :
-                                level === 'YELLOW' ? '#fde047' :
-                                level === 'GREEN' ? '#86efac' :
-                                level === 'BLUE' ? '#93c5fd' :
-                                level === 'RED' ? '#fca5a5' :
-                                level === 'BLACK' ? '#374151' :
-                                level === 'GOLD' ? '#fbbf24' : '#e5e7eb',
-                              border: level === 'WHITE' ? '1px solid #d1d5db' : 'none',
-                              width: '16px',
-                              height: '16px',
-                              borderRadius: '3px',
-                              display: 'inline-block',
-                            }}
-                          />
+                          <LevelBadge level={level as any} size={16} radius={3} />
                           <span className="text-xs text-gray-600 mt-1 font-medium">{level}</span>
                           <span className="text-xs text-gray-500 mt-1 text-center">
                             {levelHistory ? levelHistory.acquired_date : '미취득'}
