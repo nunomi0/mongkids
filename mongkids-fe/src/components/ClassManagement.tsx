@@ -815,29 +815,6 @@ export default function ClassManagement() {
     return `${startMonth}월 ${weekInMonth}주차 (${startMonth}/${startDay}~${endMonth}/${endDay})`
   }
 
-  const getLevelColor = (level: string) => {
-    switch (level) {
-      case "RED":
-        return "bg-red-100 text-red-800"
-      case "WHITE":
-        return "bg-gray-100 text-gray-800"
-      case "YELLOW":
-        return "bg-yellow-100 text-yellow-800"
-      case "GREEN":
-        return "bg-green-100 text-green-800"
-      case "BLUE":
-        return "bg-blue-100 text-blue-800"
-      case "BLACK":
-        return "bg-black text-white"
-      case "ADVANCED":
-        return "bg-purple-100 text-purple-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-
-
   // yyyy-MM-dd 포맷 키
   const getDateKey = (date: Date) => {
     const y = date.getFullYear()
@@ -893,6 +870,16 @@ export default function ClassManagement() {
         const nextDb = nextStatus === 'present' ? '출석' : nextStatus === 'absent' ? '결석' : '예정'
         const { error } = await supabase.from('attendance').update({ status: nextDb }).eq('id', att.id)
         if (error) console.error('출석 상태 저장 실패:', error)
+
+        // 보강 출석/결석 시, 연결된 정규 출석 상태도 동일하게 동기화
+        if (att.kind === '보강' && att.makeup_of_attendance_id && nextDb !== '예정') {
+          const { error: linkErr } = await supabase
+            .from('attendance')
+            .update({ status: nextDb })
+            .eq('id', att.makeup_of_attendance_id)
+          if (linkErr) console.error('정규 출석 동기화 실패:', linkErr)
+        }
+
         await loadDailyClasses(selectedDate)
       }
     }
@@ -1028,7 +1015,7 @@ export default function ClassManagement() {
         </TabsList>
 
         <TabsContent value="ongoing" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="space-y-6">
             {/* 달력 섹션 */}
             <div className="lg:col-span-1">
               <Card>
@@ -1059,29 +1046,6 @@ export default function ClassManagement() {
                     defaultMonth={selectedDate}
                     weekStartsOn={0}
                     className="rounded-md border"
-                    modifiersStyles={{
-                      present: {
-                        backgroundColor: '#22c55e',
-                        color: 'white'
-                      },
-                      absent: {
-                        backgroundColor: '#ef4444',
-                        color: 'white'
-                      },
-                      makeup: {
-                        backgroundColor: '#eab308',
-                        color: '#111827'
-                      },
-                      makeup_done: {
-                        backgroundColor: '#38bdf8',
-                        color: '#0b1324'
-                      },
-                      hover: {
-                        backgroundColor: 'hsl(var(--accent))',
-                        color: 'hsl(var(--accent-foreground))',
-                        cursor: 'pointer'
-                      }
-                    }}
                   />
                   <div className="mt-4 p-3 bg-primary/10 border border-primary/20 rounded-md">
                     <p className="text-sm font-medium text-primary">선택된 날짜:</p>
