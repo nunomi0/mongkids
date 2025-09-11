@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import MemoEditor from "./MemoEditor"
 import { format } from "date-fns"
 import LevelBadge from "./LevelBadge"
+import { getGradeLabel } from "../utils/grade"
 import { ko } from "date-fns/locale"
 
 type StudentStatus = '재원' | '휴원' | '퇴원'
@@ -60,30 +61,7 @@ interface StudentDetailModalProps {
 
 const weekdayNames = ['월', '화', '수', '목', '금', '토', '일']
 
-function getGrade(birthDate: string) {
-  const today = new Date()
-  const birth = new Date(birthDate)
-  let age = today.getFullYear() - birth.getFullYear()
-  const monthDiff = today.getMonth() - birth.getMonth()
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-    age--
-  }
-  if (age < 6) return `${age}세`
-  if (age === 6) return '초1'
-  if (age === 7) return '초2'
-  if (age === 8) return '초3'
-  if (age === 9) return '초4'
-  if (age === 10) return '초5'
-  if (age === 11) return '초6'
-  if (age === 12) return '중1'
-  if (age === 13) return '중2'
-  if (age === 14) return '중3'
-  if (age === 15) return '고1'
-  if (age === 16) return '고2'
-  if (age === 17) return '고3'
-  if (age >= 18) return '성인'
-  return `${age}세`
-}
+function getGrade(birthDate: string) { return getGradeLabel(birthDate) }
 
 function getClassTypeName(classTypeId: number | null, classTypes: ClassType[]) {
   if (!classTypeId) return '-'
@@ -226,12 +204,12 @@ export default function StudentDetailModal({ isOpen, onClose, studentId }: Stude
         {loading ? (
           <div className="p-6 text-center text-muted-foreground">불러오는 중...</div>
         ) : student ? (
-          <div className="h-[76vh] flex flex-col min-h-0">
+          <div className="flex flex-col">
             <div className="p-4 space-y-4">
               <div className="flex-shrink-0 flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border">
                 <div>
                   <div className="text-xl font-bold text-gray-900">{student.name}</div>
-                  <div className="text-sm text-gray-600">{student.birth_date} ({getGrade(student.birth_date)})</div>
+                  <div className="text-sm text-gray-600">{student.birth_date} ({getGradeLabel(student.birth_date)})</div>
                   <div className="text-sm text-gray-600">{getClassTypeName(student.class_type_id, classTypes)} ({getClassScheduleText(student.schedules)})</div>
                   <div className="text-sm text-gray-600">
                     <span className="font-medium">전화번호:</span>{' '}
