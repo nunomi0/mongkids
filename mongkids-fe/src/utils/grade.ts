@@ -1,14 +1,12 @@
 export function getGradeLabel(birthDate: string | null | undefined, now: Date = new Date()): string {
   if (!birthDate) return ''
   const birth = new Date(birthDate)
-  const today = now
-  const age = today.getFullYear() - birth.getFullYear()
-  const monthDiff = today.getMonth() - birth.getMonth()
-  if (age < 6) return `${age}세`
-  if (age === 6) return monthDiff >= 0 ? '초1' : '6세'
-  if (age <= 12) return `초${age - 5}`
-  if (age <= 15) return `중${age - 12}`
-  if (age <= 18) return `고${age - 15}`
+  const koreanAge = now.getFullYear() - birth.getFullYear() + 1
+
+  if (koreanAge < 8) return `${koreanAge}세`
+  if (koreanAge <= 13) return `초${koreanAge - 7}`
+  if (koreanAge <= 16) return `중${koreanAge - 13}`
+  if (koreanAge <= 19) return `고${koreanAge - 16}`
   return '성인'
 }
 
