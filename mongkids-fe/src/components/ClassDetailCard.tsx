@@ -7,6 +7,8 @@ import { format } from "date-fns"
 import { ko } from "date-fns/locale"
 import { supabase } from "../lib/supabase"
 import LevelBadge from "./LevelBadge"
+import { getGradeLabel } from "../utils/grade"
+import { getLevelColor } from "../utils/levelColor"
 import MemoEditor from "./MemoEditor"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog"
 import { Plus, MoreHorizontal, Trash2 } from "lucide-react"
@@ -102,18 +104,7 @@ export default function DailyClassCard({
         .select('id, name, birth_date, current_level')
         .in('id', ids)
       if (error) { console.error(error); return }
-      const computeGrade = (birthDate: string) => {
-        const birth = new Date(birthDate)
-        const today = new Date()
-        const age = today.getFullYear() - birth.getFullYear()
-        const monthDiff = today.getMonth() - birth.getMonth()
-        if (age < 6) return `${age}세`
-        if (age === 6) return monthDiff >= 0 ? '초1' : '6세'
-        if (age <= 12) return `초${age - 5}`
-        if (age <= 15) return `중${age - 12}`
-        if (age <= 18) return `고${age - 15}`
-        return '성인'
-      }
+      const computeGrade = (birthDate: string) => getGradeLabel(birthDate)
       const map = new Map<number, Student>()
       ;(data || []).forEach((st: any) => {
         map.set(st.id, {
@@ -329,31 +320,12 @@ export default function DailyClassCard({
                               <tr key={s.id} className="border-t hover:bg-accent/40">
                                 <td className="p-2 whitespace-nowrap">{s.name}</td>
                                 <td className="p-2 whitespace-nowrap">{s.gender}</td>
-                                <td className="p-2 whitespace-nowrap">{(() => {
-                                  const birth = new Date(s.birth_date)
-                                  const today = new Date()
-                                  const age = today.getFullYear() - birth.getFullYear()
-                                  const monthDiff = today.getMonth() - birth.getMonth()
-                                  if (age < 6) return `${age}세`
-                                  if (age === 6) return monthDiff >= 0 ? '초1' : '6세'
-                                  if (age <= 12) return `초${age - 5}`
-                                  if (age <= 15) return `중${age - 12}`
-                                  if (age <= 18) return `고${age - 15}`
-                                  return '성인'
-                                })()}</td>
+                                <td className="p-2 whitespace-nowrap">{getGradeLabel(s.birth_date)}</td>
                                 <td className="p-2 whitespace-nowrap">
                                   <div className="flex items-center gap-2">
                                     <div 
                                       style={{
-                                        backgroundColor: 
-                                          !s.current_level ? '#e5e7eb' :
-                                          s.current_level === 'WHITE' ? '#ffffff' :
-                                          s.current_level === 'YELLOW' ? '#fde047' :
-                                          s.current_level === 'GREEN' ? '#86efac' :
-                                          s.current_level === 'BLUE' ? '#93c5fd' :
-                                          s.current_level === 'RED' ? '#fca5a5' :
-                                          s.current_level === 'BLACK' ? '#374151' :
-                                          s.current_level === 'GOLD' ? '#fbbf24' : '#e5e7eb',
+                                        backgroundColor: getLevelColor((s.current_level as any) || 'NONE'),
                                         border: s.current_level === 'WHITE' ? '1px solid #d1d5db' : 'none',
                                         width: '12px',
                                         height: '12px',
@@ -413,12 +385,34 @@ export default function DailyClassCard({
                         className="text-red-600 hover:bg-red-50"
                         onClick={async ()=>{
                           try {
-                            const { error } = await supabase
+                            // 1) 해당 학생-수업 출석 레코드 조회 (id 획득)
+                            const { data: targetRows, error: findErr } = await supabase
+                              .from('attendance')
+                              .select('id')
+                              .eq('student_id', s.id)
+                              .eq('class_id', classItem.class_id)
+                              .limit(1)
+                              .maybeSingle()
+                            if (findErr) throw findErr
+                            const targetId = targetRows?.id as number | undefined
+
+                            // 2) 보강 레코드가 이 출석을 참조 중이면 링크 해제
+                            if (targetId) {
+                              const { error: unlinkErr } = await supabase
+                                .from('attendance')
+                                .update({ makeup_of_attendance_id: null })
+                                .eq('makeup_of_attendance_id', targetId)
+                              if (unlinkErr) throw unlinkErr
+                            }
+
+                            // 3) 해당 출석 레코드 삭제
+                            const { error: delErr } = await supabase
                               .from('attendance')
                               .delete()
                               .eq('student_id', s.id)
                               .eq('class_id', classItem.class_id)
-                            if (error) throw error
+                            if (delErr) throw delErr
+
                             onClassUpdated && onClassUpdated()
                           } catch (e) {
                             console.error('학생 삭제 실패:', e)

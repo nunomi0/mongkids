@@ -1,6 +1,5 @@
 import React from "react"
-
-export type LevelValue = 'NONE' | 'WHITE' | 'YELLOW' | 'GREEN' | 'BLUE' | 'RED' | 'BLACK' | 'GOLD'
+import { getLevelColor, LevelValue } from "../utils/levelColor"
 
 interface LevelBadgeProps {
   level: LevelValue | '' | null | undefined
@@ -11,19 +10,7 @@ interface LevelBadgeProps {
 }
 
 export default function LevelBadge({ level, size = 12, radius = 2, className, showBorderForWhite = true }: LevelBadgeProps) {
-  const bg = (() => {
-    switch (level) {
-      case 'WHITE': return '#ffffff'
-      case 'YELLOW': return '#fde047'
-      case 'GREEN': return '#86efac'
-      case 'BLUE': return '#93c5fd'
-      case 'RED': return '#fca5a5'
-      case 'BLACK': return '#374151'
-      case 'GOLD': return '#fbbf24'
-      case 'NONE':
-      default: return '#e5e7eb'
-    }
-  })()
+  const bg = getLevelColor(level)
 
   const border = level === 'WHITE' && showBorderForWhite ? '1px solid #d1d5db' : 'none'
 
