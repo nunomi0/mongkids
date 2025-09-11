@@ -8,6 +8,7 @@ import { Button } from "./ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog"
 import { supabase } from "../lib/supabase"
 import StudentDetailModal from "./StudentDetailModal"
+import { getGradeLabel } from "../utils/grade"
 import LevelBadge from "./LevelBadge"
 // 로컬 타입 정의 (supabase.ts의 api 의존 제거)
 type LevelType = 'WHITE' | 'YELLOW' | 'GREEN' | 'BLUE' | 'RED' | 'BLACK' | 'GOLD' | null
@@ -1294,7 +1295,7 @@ export default function StudentManagement() {
                       >
                         <TableCell>{student.name}</TableCell>
                         <TableCell>{student.gender}</TableCell>
-                        <TableCell>{getGrade(student.birth_date)}</TableCell>
+                        <TableCell>{getGradeLabel(student.birth_date)}</TableCell>
                         <TableCell>
                           {student.current_level ? <LevelBadge level={student.current_level as any} /> : "-"}
                         </TableCell>

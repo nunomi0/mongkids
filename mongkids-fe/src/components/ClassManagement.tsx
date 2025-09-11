@@ -18,6 +18,7 @@ import { Input } from "./ui/input"
 import StudentDetailModal from "./StudentDetailModal"
 import ClassDetailCard from "./ClassDetailCard"
 import LevelBadge from "./LevelBadge"
+import { getGradeLabel } from "../utils/grade"
 
 
 
@@ -381,19 +382,7 @@ export default function ClassManagement() {
           const st = a.students
           if (!st) return null
           // 학년 계산
-          let grade = ''
-          if (st.birth_date) {
-            const birth = new Date(st.birth_date)
-            const today = new Date()
-            const age = today.getFullYear() - birth.getFullYear()
-            const monthDiff = today.getMonth() - birth.getMonth()
-            if (age < 6) grade = `${age}세`
-            else if (age === 6) grade = monthDiff >= 0 ? '초1' : '6세'
-            else if (age <= 12) grade = `초${age - 5}`
-            else if (age <= 15) grade = `중${age - 12}`
-            else if (age <= 18) grade = `고${age - 15}`
-            else grade = '성인'
-          }
+          const grade = st.birth_date ? getGradeLabel(st.birth_date) : ''
           return { id: st.id, name: st.name, grade, level: st.current_level || 'NONE' }
         }).filter(s => !!s && !!s.id)
       }))
@@ -472,26 +461,8 @@ export default function ClassManagement() {
             const student = a.students
             if (!student) return null
             
-            // 한국 나이/학년 계산
-            const birthDate = new Date(student.birth_date)
-            const today = new Date()
-            const age = today.getFullYear() - birthDate.getFullYear()
-            const monthDiff = today.getMonth() - birthDate.getMonth()
-            
-            let grade = ''
-            if (age < 6) {
-              grade = `${age}세`
-            } else if (age === 6) {
-              grade = monthDiff >= 0 ? '초1' : '6세'
-            } else if (age <= 12) {
-              grade = `초${age - 5}`
-            } else if (age <= 15) {
-              grade = `중${age - 12}`
-            } else if (age <= 18) {
-              grade = `고${age - 15}`
-            } else {
-              grade = '성인'
-            }
+            // 학년 계산 통일
+            const grade = student.birth_date ? getGradeLabel(student.birth_date) : ''
             
             return {
               id: student.id,
