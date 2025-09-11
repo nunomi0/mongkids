@@ -38,7 +38,7 @@ type ClassType = {
 
 type LevelHistory = { level: string; acquired_date: string }
 
-type AttendanceItem = { status: string; classes?: { date?: string } }
+type AttendanceItem = { id: number; status: '예정'|'출석'|'결석'; kind?: '정규'|'보강'; note?: string | null; classes?: { date?: string, time?: string } }
 
 type PaymentItem = {
   id: number
@@ -111,6 +111,7 @@ export default function StudentDetailModal({ isOpen, onClose, studentId }: Stude
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [deleteConfirmName, setDeleteConfirmName] = useState("")
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
+  const [editingMemoId, setEditingMemoId] = useState<number | null>(null)
   const [editStudent, setEditStudent] = useState<{ name: string; birth_date: string; phone: string; shoe_size: string; status: StudentStatus; class_type_id: string; current_level: '' | 'WHITE' | 'YELLOW' | 'GREEN' | 'BLUE' | 'RED' | 'BLACK' | 'GOLD' | 'NONE' } | null>(null)
   const [newPayment, setNewPayment] = useState<{ payment_date: string; payment_month: string; total_amount: string; payment_method: string; shoe_discount: string; sibling_discount: string; additional_discount: string }>({
     payment_date: new Date().toISOString().slice(0, 10),
@@ -188,7 +189,7 @@ export default function StudentDetailModal({ isOpen, onClose, studentId }: Stude
       // 출석 (없으면 빈 배열)
       const { data: attData } = await supabase
         .from('attendance')
-        .select('status, classes(date)')
+        .select('id, status, kind, note, classes:classes(date, time)')
         .eq('student_id', id)
         .order('created_at', { ascending: false })
       setAttendance((attData as AttendanceItem[]) || [])
@@ -294,13 +295,12 @@ export default function StudentDetailModal({ isOpen, onClose, studentId }: Stude
                             <SelectValue placeholder="연-월 선택" />
                           </SelectTrigger>
                           <SelectContent>
-                            {Array.from({ length: 18 }).map((_, idx) => {
-                              const d = new Date()
-                              d.setMonth(d.getMonth() - idx)
-                              const ym = d.toISOString().slice(0,7)
-                              const label = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
-                              return <SelectItem key={ym} value={ym}>{label}</SelectItem>
-                            })}
+                            {[...new Set(attendance
+                              .filter(a => a.classes?.date)
+                              .map(a => (a.classes!.date as string).slice(0,7))
+                            )].sort().reverse().map(ym => (
+                              <SelectItem key={ym} value={ym}>{ym}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -308,26 +308,80 @@ export default function StudentDetailModal({ isOpen, onClose, studentId }: Stude
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div className="space-y-1 text-sm">
-                    {(() => {
-                      const items = (attendance || [])
-                        .filter(a => a.classes?.date && a.classes.date.startsWith(attnYearMonth))
-                        .map(a => ({ date: a.classes!.date as string, status: a.status || 'none' }))
-                        .sort((a,b) => a.date.localeCompare(b.date))
-                      if (items.length === 0) return <div className="text-muted-foreground text-xs">기록 없음</div>
-                      return (
-                        <div className="grid grid-cols-1 gap-1">
-                          {items.map((it, i) => (
-                            <div key={`${it.date}-${i}`} className="flex items-center justify-between px-2 py-1 rounded hover:bg-accent/40">
-                              <span className="tabular-nums">{format(new Date(it.date), 'MM/dd (E)', { locale: ko })}</span>
-                              <Badge variant="outline" className="text-xs">
-                                {it.status || 'none'}
-                              </Badge>
-                            </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left p-2">날짜</th>
+                          <th className="text-left p-2">시간</th>
+                          <th className="text-left p-2">구분</th>
+                          <th className="text-left p-2">상태</th>
+                          <th className="text-left p-2">메모</th>
+                          <th className="text-right p-2">액션</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {attendance
+                          .filter(a => a.classes?.date && (a.classes!.date as string).startsWith(attnYearMonth))
+                          .sort((a,b) => ((a.classes!.date as string)+(a.classes!.time||'' )).localeCompare((b.classes!.date as string)+(b.classes!.time||'')))
+                          .map((a) => (
+                            <tr key={a.id} className="border-t">
+                              <td className="p-2 whitespace-nowrap">{a.classes?.date ? format(new Date(a.classes.date), 'MM/dd (E)', { locale: ko }) : '-'}</td>
+                              <td className="p-2 whitespace-nowrap">{a.classes?.time ? (a.classes.time as string).slice(0,5) : '-'}</td>
+                              <td className="p-2 whitespace-nowrap">{a.kind || ((a as any).makeup_of_attendance_id ? '보강' : '정규')}</td>
+                              <td className="p-2 whitespace-nowrap">
+                                <select
+                                  className="border rounded px-2 py-1 cursor-pointer hover:bg-accent/30"
+                                  value={a.status}
+                                  onChange={(e)=> setAttendance(prev => prev.map(x => x.id === a.id ? { ...x, status: e.target.value as any } : x))}
+                                >
+                                  {['예정','출석','결석'].map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                              </td>
+                              <td className="p-2" title={a.note || ''}>
+                                {editingMemoId === a.id ? (
+                                  <Input
+                                    autoFocus
+                                    value={a.note || ''}
+                                    onChange={(e)=> setAttendance(prev => prev.map(x => x.id === a.id ? { ...x, note: e.target.value } : x))}
+                                    placeholder="메모"
+                                  />
+                                ) : (
+                                  <div className="text-ellipsis overflow-hidden whitespace-nowrap max-w-[180px]">
+                                    {a.note || <span className="text-muted-foreground">-</span>}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-2 text-right">
+                                {editingMemoId === a.id ? (
+                                  <div className="flex items-center justify-end gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={async()=>{
+                                        try {
+                                          await supabase.from('attendance').update({ status: a.status, note: a.note ?? null }).eq('id', a.id)
+                                          setEditingMemoId(null)
+                                        } catch (e) {
+                                          console.error('출석 업데이트 실패:', e)
+                                        }
+                                      }}
+                                    >저장</Button>
+                                    <Button size="sm" variant="outline" onClick={()=> setEditingMemoId(null)}>취소</Button>
+                                  </div>
+                                ) : (
+                                  <Button size="sm" variant="outline" onClick={()=> setEditingMemoId(a.id)}>편집</Button>
+                                )}
+                              </td>
+                            </tr>
                           ))}
-                        </div>
-                      )
-                    })()}
+                        {attendance.filter(a => a.classes?.date && (a.classes!.date as string).startsWith(attnYearMonth)).length === 0 && (
+                          <tr>
+                            <td colSpan={6} className="p-4 text-center text-muted-foreground">기록 없음</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </CardContent>
               </Card>

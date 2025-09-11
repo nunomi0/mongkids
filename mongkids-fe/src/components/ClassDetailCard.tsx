@@ -40,6 +40,10 @@ interface DailyClassCardProps {
   toDateObjectsFromMonthDay: (baseDate: Date, monthDayList: string[]) => Date[]
   onClassUpdated?: () => void
   borderless?: boolean
+  getDisplayStatus?: (studentId: number) => 'REGULAR_PLANNED'|'REGULAR_PRESENT'|'REGULAR_ABSENT'|'REGULAR_MAKEUP_PLANNED'|'REGULAR_MAKEUP_PRESENT'|'REGULAR_MAKEUP_ABSENT'|'MAKEUP_PLANNED'|'MAKEUP_PRESENT'|'MAKEUP_ABSENT'|'NONE'
+  getDisplayStatusForCell?: (studentId: number, idx: number) => 'REGULAR_PLANNED'|'REGULAR_PRESENT'|'REGULAR_ABSENT'|'REGULAR_MAKEUP_PLANNED'|'REGULAR_MAKEUP_PRESENT'|'REGULAR_MAKEUP_ABSENT'|'MAKEUP_PLANNED'|'MAKEUP_PRESENT'|'MAKEUP_ABSENT'|'NONE'
+  getAttendanceRecord?: (studentId: number) => { id: number; note?: string | null } | undefined
+  updateAttendanceNote?: (attendanceId: number, note: string | null) => Promise<void>
 }
 
 export default function DailyClassCard({
@@ -53,7 +57,11 @@ export default function DailyClassCard({
   setHoveredCalendarDates,
   toDateObjectsFromMonthDay,
   onClassUpdated,
-  borderless
+  borderless,
+  getDisplayStatus,
+  getDisplayStatusForCell,
+  getAttendanceRecord,
+  updateAttendanceNote
 }: DailyClassCardProps) {
   const toHm = (t?: string) => (t && t.length >= 5 ? t.slice(0,5) : t || "")
   const [enriched, setEnriched] = useState<Student[] | null>(null)
@@ -68,6 +76,16 @@ export default function DailyClassCard({
     schedules: { weekday: number; time: string; group_no: number }[]
   }[]>([])
   const [isAddOpen, setIsAddOpen] = useState(false)
+  const [isLinkOpen, setIsLinkOpen] = useState(false)
+  const [pendingAddStudentId, setPendingAddStudentId] = useState<number | null>(null)
+  const [sourceAttendances, setSourceAttendances] = useState<Array<{ id: number; status: '예정'|'출석'|'결석'; date: string; time: string; group_no: number }>>([])
+  const [selectedSourceId, setSelectedSourceId] = useState<number | null>(null)
+  const [linkMonth, setLinkMonth] = useState<string>(new Date().toISOString().slice(0,7))
+  const [monthOptions, setMonthOptions] = useState<Array<{ value: string; label: string }>>([])
+  const [makeupNote, setMakeupNote] = useState<string>("")
+  const [memoOpen, setMemoOpen] = useState(false)
+  const [memoStudentId, setMemoStudentId] = useState<number | null>(null)
+  const [memoDraft, setMemoDraft] = useState<string>("")
 
   useEffect(() => {
     // 주차별 모달에서 넘어온 학생 데이터에 grade/level이 없을 수 있어 보강
@@ -150,21 +168,92 @@ export default function DailyClassCard({
     return () => { cancelled = true }
   }, [studentSearch, classItem.students])
 
-  const addStudentToThisClass = async (studentId: number) => {
+  const loadSourceAttendances = async (studentId: number, ym: string) => {
+    const [y, m] = ym.split('-').map(n => parseInt(n, 10))
+    const from = new Date(y, m - 1, 1)
+    const to = new Date(y, m, 0)
+    const fromStr = `${from.getFullYear()}-${String(from.getMonth()+1).padStart(2,'0')}-${String(from.getDate()).padStart(2,'0')}`
+    const toStr = `${to.getFullYear()}-${String(to.getMonth()+1).padStart(2,'0')}-${String(to.getDate()).padStart(2,'0')}`
+    const { data, error } = await supabase
+      .from('attendance')
+      .select('id, status, kind, classes:classes(date, time, group_no)')
+      .eq('student_id', studentId)
+      .is('makeup_of_attendance_id', null)
+      .in('status', ['예정','결석'])
+      .gte('classes.date', fromStr)
+      .lte('classes.date', toStr)
+      .order('date', { ascending: true, foreignTable: 'classes' })
+    if (error) throw error
+    const list = (data || []).filter((a: any) => a.classes && a.classes.date && a.classes.time).map((a: any) => ({
+      id: a.id as number,
+      status: a.status as '예정'|'출석'|'결석',
+      date: (a.classes!.date as string),
+      time: (a.classes!.time as string),
+      group_no: ((a.classes!.group_no as number) || 1),
+    }))
+    setSourceAttendances(list)
+  }
+
+  const openLinkModal = async (studentId: number) => {
+    setPendingAddStudentId(studentId)
+    setSelectedSourceId(null)
     try {
+      // 사용 가능한 월 목록(정규 예정/결석) 조회
+      const from = new Date(); from.setFullYear(from.getFullYear() - 2) // 최근 2년
+      const fromStr = `${from.getFullYear()}-${String(from.getMonth()+1).padStart(2,'0')}-${String(from.getDate()).padStart(2,'0')}`
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('id, status, classes:classes(date)')
+        .eq('student_id', studentId)
+        .is('makeup_of_attendance_id', null)
+        .in('status', ['예정','결석'])
+        .gte('classes.date', fromStr)
+        .order('date', { ascending: false, foreignTable: 'classes' })
+      if (error) throw error
+      const monthsSet = new Set<string>()
+      ;(data || []).forEach((a: any) => {
+        const dt = a?.classes?.date as string | undefined
+        if (dt && dt.length >= 7) monthsSet.add(dt.slice(0,7))
+      })
+      const options = Array.from(monthsSet)
+        .sort((a,b) => a.localeCompare(b) * -1)
+        .map(ym => {
+          const [y, m] = ym.split('-').map(n=>parseInt(n,10))
+          return { value: ym, label: `${y}년 ${m}월` }
+        })
+      setMonthOptions(options)
+      const initialYm = options.length > 0 ? options[0].value : new Date().toISOString().slice(0,7)
+      setLinkMonth(initialYm)
+      await loadSourceAttendances(studentId, initialYm)
+    } catch (e) {
+      console.error('정규 출석 불러오기 실패:', e)
+      setSourceAttendances([])
+    } finally {
+      setIsLinkOpen(true)
+    }
+  }
+
+  const confirmAddMakeup = async () => {
+    if (!pendingAddStudentId || !selectedSourceId) return
+    try {
+      const payload: any = { student_id: pendingAddStudentId, class_id: classItem.class_id, status: '예정', kind: '보강', makeup_of_attendance_id: selectedSourceId, note: makeupNote || null }
       const { error } = await supabase
         .from('attendance')
-        .upsert({ student_id: studentId, class_id: classItem.class_id, status: '예정' }, { onConflict: 'student_id,class_id' })
+        .upsert(payload, { onConflict: 'student_id,class_id' })
       if (error) throw error
+      setIsLinkOpen(false)
+      setIsAddOpen(false)
       setStudentSearch("")
       setSearchResults([])
+      setMakeupNote("")
       onClassUpdated && onClassUpdated()
     } catch (e) {
-      console.error('학생 추가 실패:', e)
+      console.error('보강 편성 실패:', e)
     }
   }
 
   return (
+    <>
     <Card className={borderless ? 'border-none shadow-none' : undefined}>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
@@ -257,7 +346,7 @@ export default function DailyClassCard({
                                   </div>
                                 </td>
                                 <td className="p-2 text-right">
-                                  <Button size="sm" variant="outline" onClick={async () => { await addStudentToThisClass(s.id); onClassUpdated && onClassUpdated() }}>추가</Button>
+                                  <Button size="sm" variant="outline" onClick={() => openLinkModal(s.id)}>보강 편성</Button>
                                 </td>
                               </tr>
                             ))
@@ -290,28 +379,27 @@ export default function DailyClassCard({
           </div>
           <div className="space-y-3">
             {studentsToRender.map((student) => (
+              <React.Fragment key={student.id}>
               <div 
-                key={student.id} 
                 className="flex items-center justify-between p-2 rounded border cursor-pointer hover:bg-accent/50 transition-colors"
                 onClick={() => toggleAttendanceForSelectedDate(student.id, classItem.class_id)}
-                style={{
-                  backgroundColor: (() => {
-                    const s = getStatusOnDate(student.id, selectedDate)
-                    if (s === 'present') return '#dcfce7'
-                    if (s === 'absent') return '#f3f4f6'
-                    if (s === 'makeup') return '#fefce8'
-                    if (s === 'makeup_done') return '#e0f2fe'
-                    return 'transparent'
-                  })(),
-                  borderColor: (() => {
-                    const s = getStatusOnDate(student.id, selectedDate)
-                    if (s === 'present') return '#22c55e'
-                    if (s === 'absent') return '#9ca3af'
-                    if (s === 'makeup') return '#eab308'
-                    if (s === 'makeup_done') return '#38bdf8'
-                    return '#e5e7eb'
-                  })()
-                }}
+                style={(() => {
+                  const disp = getDisplayStatus ? getDisplayStatus(student.id) : undefined
+                  let bg = 'transparent'
+                  let border = '#e5e7eb'
+                  switch (disp) {
+                    case 'REGULAR_PLANNED': bg = '#ffffff'; border = '#e5e7eb'; break
+                    case 'REGULAR_PRESENT': bg = '#dcfce7'; border = '#22c55e'; break
+                    case 'REGULAR_ABSENT': bg = '#fee2e2'; border = '#ef4444'; break
+                    case 'REGULAR_MAKEUP_PLANNED': bg = '#e0f2fe'; border = '#38bdf8'; break
+                    case 'REGULAR_MAKEUP_PRESENT': bg = '#bbf7d0'; border = '#22c55e'; break
+                    case 'REGULAR_MAKEUP_ABSENT': bg = '#fecaca'; border = '#ef4444'; break
+                    case 'MAKEUP_PLANNED': bg = '#ffffff'; border = '#e5e7eb'; break
+                    case 'MAKEUP_PRESENT': bg = '#dcfce7'; border = '#22c55e'; break
+                    case 'MAKEUP_ABSENT': bg = '#fee2e2'; border = '#ef4444'; break
+                  }
+                  return { backgroundColor: bg, borderColor: border }
+                })()}
               >
                 <div className="flex items-center gap-3">
                   <span 
@@ -333,16 +421,29 @@ export default function DailyClassCard({
                         <button
                           key={idx}
                           className="h-4 w-4 rounded-sm border cursor-pointer hover:opacity-80 transition-opacity"
-                          style={{
-                            backgroundColor: (() => {
-                              const state = getWeeklyCells(student.id, selectedDate)[idx]
-                              if (state === 'present') return '#22c55e' // 초록
-                              if (state === 'absent') return '#9ca3af' // 회색
-                              if (state === 'makeup') return '#eab308' // 노랑
-                              return 'transparent' // 표시 안 함은 투명
-                            })(),
-                            borderColor: '#d1d5db'
-                          }}
+                          style={(() => {
+                            // 셀 대표 상태를 표시 규칙으로 변환하여 색상 동기화
+                            const disp = getDisplayStatusForCell ? getDisplayStatusForCell(student.id, idx) : undefined
+                            let bg = 'transparent'
+                            switch (disp) {
+                              case 'REGULAR_PLANNED':
+                              case 'MAKEUP_PLANNED':
+                                bg = '#ffffff'; break
+                              case 'REGULAR_PRESENT':
+                              case 'MAKEUP_PRESENT':
+                                bg = '#22c55e'; break
+                              case 'REGULAR_ABSENT':
+                              case 'MAKEUP_ABSENT':
+                                bg = '#ef4444'; break
+                              case 'REGULAR_MAKEUP_PLANNED':
+                                bg = '#38bdf8'; break
+                              case 'REGULAR_MAKEUP_PRESENT':
+                                bg = '#86efac'; break
+                              case 'REGULAR_MAKEUP_ABSENT':
+                                bg = '#fecaca'; break
+                            }
+                            return { backgroundColor: bg, borderColor: '#d1d5db' }
+                          })()}
                           onClick={(e) => { e.stopPropagation(); toggleAttendanceForSelectedDate(student.id, classItem.class_id) }}
                           onMouseEnter={() => {
                             const { present, absent, makeup, makeup_done } = getAttendanceDatesForCellByStatus(student.id, selectedDate, idx)
@@ -367,13 +468,152 @@ export default function DailyClassCard({
                         />
                       ))}
                     </div>
+                    {(() => {
+                      const rec = getAttendanceRecord ? getAttendanceRecord(student.id) : undefined
+                      const note = rec?.note || ''
+                      const hasNote = !!note
+                      return (
+                        <button
+                          className="ml-2 text-xs px-1.5 py-0.5 rounded hover:bg-accent/40 cursor-pointer"
+                          style={{ color: hasNote ? '#111827' : '#9ca3af' }}
+                          title={hasNote ? note : '메모 없음'}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setMemoStudentId(student.id)
+                            setMemoDraft(note)
+                            setMemoOpen(true)
+                          }}
+                          aria-label="메모 편집"
+                        >
+                          ✎
+                        </button>
+                      )
+                    })()}
                   </div>
                 </div>
               </div>
+              {/* 메모 편집 모달 - 학생별 */}
+              <Dialog open={memoOpen && memoStudentId === student.id} onOpenChange={(o)=>{ if(!o){ setMemoOpen(false); setMemoStudentId(null)} }}>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>
+                      메모 {studentsToRender.find(s=>s.id===student.id)?.name ? `- ${studentsToRender.find(s=>s.id===student.id)!.name}` : ''}
+                    </DialogTitle>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {format(selectedDate, 'yyyy-MM-dd (E)', { locale: ko })} · {toHm(classItem.time)} · 그룹 {classItem.group_no}
+                    </div>
+                  </DialogHeader>
+                  <div className="space-y-3">
+                    <textarea
+                      className="w-full border rounded p-2 text-sm min-h-[120px]"
+                      value={memoDraft}
+                      onChange={(e)=>setMemoDraft(e.target.value)}
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          const rec = getAttendanceRecord ? getAttendanceRecord(student.id) : undefined
+                          if (rec?.id && updateAttendanceNote) {
+                            await updateAttendanceNote(rec.id, memoDraft.trim()===''? null : memoDraft)
+                          }
+                          setMemoOpen(false); setMemoStudentId(null)
+                        }
+                      }}
+                      placeholder="메모를 입력하세요"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={()=>{ setMemoOpen(false); setMemoStudentId(null)}}>취소</Button>
+                      <Button onClick={async()=>{
+                        const rec = getAttendanceRecord ? getAttendanceRecord(student.id) : undefined
+                        if (rec?.id && updateAttendanceNote) {
+                          await updateAttendanceNote(rec.id, memoDraft.trim()===''? null : memoDraft)
+                        }
+                        setMemoOpen(false); setMemoStudentId(null)
+                      }}>저장</Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              </React.Fragment>
             ))}
           </div>
         </div>
       </CardContent>
     </Card>
+
+    {/* 보강 수업 편성 모달 */}
+    <Dialog open={isLinkOpen} onOpenChange={setIsLinkOpen}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>보강 수업 편성</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-medium">연결할 정규 수업(예정/결석)을 선택하세요</div>
+              {monthOptions.length > 0 ? (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-muted-foreground">월 선택</label>
+                  <select
+                    className="px-2 py-1 text-sm border rounded-md bg-white"
+                    value={linkMonth}
+                    onChange={async (e) => {
+                      const ym = e.target.value
+                      setLinkMonth(ym)
+                      if (pendingAddStudentId) {
+                        try { await loadSourceAttendances(pendingAddStudentId, ym) } catch {}
+                      }
+                    }}
+                  >
+                    {monthOptions.map(m => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div></div>
+              )}
+            </div>
+            <div className="border rounded-md max-h-60 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50 sticky top-0">
+                  <tr>
+                    <th className="text-left p-2">날짜</th>
+                    <th className="text-left p-2">시간</th>
+                    <th className="text-left p-2">그룹</th>
+                    <th className="text-left p-2">상태</th>
+                    <th className="text-right p-2">선택</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sourceAttendances.length > 0 ? sourceAttendances.map(a => (
+                    <tr key={a.id} className="border-t">
+                      <td className="p-2 whitespace-nowrap">{format(new Date(a.date), 'yyyy-MM-dd', { locale: ko })}</td>
+                      <td className="p-2 whitespace-nowrap">{a.time?.slice(0,5)}</td>
+                      <td className="p-2 whitespace-nowrap">{a.group_no}</td>
+                      <td className="p-2 whitespace-nowrap">{a.status}</td>
+                      <td className="p-2 whitespace-nowrap text-right">
+                        <input type="radio" name="sourceAtt" checked={selectedSourceId === a.id} onChange={() => setSelectedSourceId(a.id)} />
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={5} className="p-4 text-center text-muted-foreground">선택 가능한 정규 수업이 없습니다</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-3">
+              <label className="block text-xs text-muted-foreground mb-1">메모</label>
+              <Input value={makeupNote} onChange={(e)=>setMakeupNote(e.target.value)} placeholder="메모를 입력하세요" />
+            </div>
+            <div className="flex justify-end gap-2 mt-3">
+              <Button onClick={confirmAddMakeup} disabled={!selectedSourceId}>보강으로 편성</Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }

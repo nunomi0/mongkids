@@ -58,6 +58,9 @@ export default function ClassManagement() {
     group_no: number
     students: { id: number; name: string; grade: string; level: string }[]
   }[]>([])
+  // attendance 상세 맵과 정규→보강 링크 맵
+  const [attendanceMap, setAttendanceMap] = useState<Record<string, { id: number; student_id: number; class_id: number; date: string; status: '예정'|'출석'|'결석'; kind: '정규'|'보강'; makeup_of_attendance_id: number | null }>>({})
+  const [makeupByRegularId, setMakeupByRegularId] = useState<Record<number, { id: number; status: '예정'|'출석'|'결석' }>>({})
   
   // 학생 상세 정보 다이얼로그
   const [isStudentDetailOpen, setIsStudentDetailOpen] = useState(false)
@@ -440,8 +443,12 @@ export default function ClassManagement() {
           time, 
           group_no, 
           attendance:attendance(
+            id,
             student_id,
             status,
+            kind,
+            makeup_of_attendance_id,
+            note,
             students:students(
               id, 
               name, 
@@ -497,6 +504,49 @@ export default function ClassManagement() {
       }))
 
       setDailyClasses(mapped)
+      // attendance 맵 구성 및 정규→보강 링크 수집
+      const nextMap: Record<string, { id: number; student_id: number; class_id: number; date: string; status: '예정'|'출석'|'결석'; kind: '정규'|'보강'; makeup_of_attendance_id: number | null; note?: string | null }> = {}
+      const regularIds: number[] = []
+      ;(data || []).forEach((c: any) => {
+        const classId = c.id as number
+        const dateKey = dateStr;
+        ((c.attendance as any[]) || []).forEach((a: any) => {
+          const key = `${dateKey}-${classId}-${a.student_id}`
+          nextMap[key] = {
+            id: a.id as number,
+            student_id: a.student_id as number,
+            class_id: classId,
+            date: dateKey,
+            status: a.status as '예정'|'출석'|'결석',
+            kind: (a.kind === '보강' ? '보강' : '정규') as '정규'|'보강',
+            makeup_of_attendance_id: a.makeup_of_attendance_id ?? null,
+            note: (a as any).note ?? null,
+          }
+          if (a.kind !== '보강') {
+            regularIds.push(a.id as number)
+          }
+        })
+      })
+      setAttendanceMap(nextMap)
+      // 연결된 보강 출석 조회 (다른 날짜 포함 가능)
+      if (regularIds.length > 0) {
+        const { data: mk, error: mkErr } = await supabase
+          .from('attendance')
+          .select('id, status, makeup_of_attendance_id, note')
+          .in('makeup_of_attendance_id', Array.from(new Set(regularIds)))
+        if (!mkErr && mk) {
+          const linkMap: Record<number, { id: number; status: '예정'|'출석'|'결석' }> = {}
+          mk.forEach((m: any) => {
+            const rid = m.makeup_of_attendance_id as number
+            linkMap[rid] = { id: m.id as number, status: m.status as '예정'|'출석'|'결석' }
+          })
+          setMakeupByRegularId(linkMap)
+        } else {
+          setMakeupByRegularId({})
+        }
+      } else {
+        setMakeupByRegularId({})
+      }
       // DB 출석 상태를 로컬 상태에 반영 (해당 날짜)
       const nextStatusState: Record<number, Record<string, 'present' | 'absent' | 'makeup' | 'makeup_done'>> = {}
       const mapDbToUi = (s?: string) => (
@@ -526,6 +576,55 @@ export default function ClassManagement() {
       console.error('일별 수업 로드 오류:', e)
       setDailyClasses([])
       setHasAttendanceData(prev => ({ ...prev, daily: false }))
+    }
+  }
+
+  // 표시 상태 계산 (정규/보강 + 보강 동기화 반영)
+  type DisplayStatus = 'REGULAR_PLANNED'|'REGULAR_PRESENT'|'REGULAR_ABSENT'|'REGULAR_MAKEUP_PLANNED'|'REGULAR_MAKEUP_PRESENT'|'REGULAR_MAKEUP_ABSENT'|'MAKEUP_PLANNED'|'MAKEUP_PRESENT'|'MAKEUP_ABSENT'|'NONE'
+  const getDisplayStatus = (studentId: number, date: Date, classId: number): DisplayStatus => {
+    const key = `${toDateStr(date)}-${classId}-${studentId}`
+    const att = attendanceMap[key]
+    if (!att) return 'NONE'
+    if (att.kind === '보강') {
+      if (att.status === '예정') return 'MAKEUP_PLANNED'
+      if (att.status === '출석') return 'MAKEUP_PRESENT'
+      if (att.status === '결석') return 'MAKEUP_ABSENT'
+      return 'NONE'
+    }
+    // 정규
+    if (att.status === '출석') return 'REGULAR_PRESENT'
+    if (att.status === '결석') {
+      const mk = makeupByRegularId[att.id]
+      if (!mk) return 'REGULAR_ABSENT'
+      if (mk.status === '예정') return 'REGULAR_MAKEUP_PLANNED'
+      if (mk.status === '출석') return 'REGULAR_MAKEUP_PRESENT'
+      if (mk.status === '결석') return 'REGULAR_MAKEUP_ABSENT'
+      return 'REGULAR_ABSENT'
+    }
+    // 예정
+    {
+      const mk = makeupByRegularId[att.id]
+      if (!mk) return 'REGULAR_PLANNED'
+      if (mk.status === '예정') return 'REGULAR_MAKEUP_PLANNED'
+      if (mk.status === '출석') return 'REGULAR_MAKEUP_PRESENT'
+      if (mk.status === '결석') return 'REGULAR_MAKEUP_ABSENT'
+      return 'REGULAR_PLANNED'
+    }
+  }
+
+  // 개별 출석 레코드 조회 및 메모 업데이트
+  const getAttendanceRecord = (studentId: number, date: Date, classId: number) => {
+    const key = `${toDateStr(date)}-${classId}-${studentId}`
+    return attendanceMap[key]
+  }
+
+  const updateAttendanceNote = async (attendanceId: number, note: string | null) => {
+    try {
+      const { error } = await supabase.from('attendance').update({ note: note ?? null }).eq('id', attendanceId)
+      if (error) throw error
+      await loadDailyClasses(selectedDate)
+    } catch (e) {
+      console.error('메모 업데이트 실패:', e)
     }
   }
 
@@ -755,18 +854,13 @@ export default function ClassManagement() {
   const isAttendedOnDate = (studentId: number, date: Date) => getStatusOnDate(studentId, date) === 'present'
 
   // 출석 토글 (일별 수업에서 선택된 날짜 기준)
-  const toggleAttendanceForSelectedDate = (studentId: number, classId?: number) => {
+  const toggleAttendanceForSelectedDate = async (studentId: number, classId?: number) => {
     const key = getDateKey(selectedDate)
     const current = attendanceStatus[studentId]?.[key] || 'none'
-    // 규칙: makeup_done은 make_up 상태에서만 전환 허용
-    const nextStatus: 'present' | 'absent' | 'makeup' | 'makeup_done' | 'none' =
-      current === 'none' ? 'present'
-      : current === 'present' ? 'absent'
-      : current === 'absent' ? 'makeup'
-      : current === 'makeup' ? 'makeup_done'
-      : current === 'makeup_done' ? 'none'
-      : 'none'
-
+    // 상태는 예정/출석/결석 3단계만 사용 (UI: none/present/absent)
+    const nextStatus: 'present' | 'absent' | 'none' =
+      current === 'none' ? 'present' : current === 'present' ? 'absent' : 'none'
+    console.log(studentId, key, nextStatus);
     setAttendanceStatus(prev => {
       const mapForStudent = { ...(prev[studentId] || {}) }
       mapForStudent[key] = nextStatus
@@ -792,21 +886,15 @@ export default function ClassManagement() {
 
     // DB 반영 (optional classId가 전달된 경우만)
     if (classId) {
-      const mapUiToDb = (s: 'present'|'absent'|'makeup'|'none'|'makeup_done') => (
-        s === 'present' ? '출석'
-        : s === 'absent' ? '결석'
-        : s === 'makeup' ? '보강예정'
-        : '예정'
-      ) as string
-      const dbStatus = mapUiToDb(nextStatus)
-      supabase
-        .from('attendance')
-        .upsert({ student_id: studentId, class_id: classId, status: dbStatus }, { onConflict: 'student_id,class_id' })
-        .then(({ error }) => {
-          if (error) {
-            console.error('출석 상태 저장 실패:', error)
-          }
-        })
+      // 해당 attendance id를 찾아 직접 업데이트 (정규/보강 공통)
+      const aKey = `${toDateStr(selectedDate)}-${classId}-${studentId}`
+      const att = attendanceMap[aKey]
+      if (att) {
+        const nextDb = nextStatus === 'present' ? '출석' : nextStatus === 'absent' ? '결석' : '예정'
+        const { error } = await supabase.from('attendance').update({ status: nextDb }).eq('id', att.id)
+        if (error) console.error('출석 상태 저장 실패:', error)
+        await loadDailyClasses(selectedDate)
+      }
     }
   }
 
@@ -1022,6 +1110,13 @@ export default function ClassManagement() {
                         openStudentDetail={openStudentDetail}
                         setHoveredCalendarDates={setHoveredCalendarDates}
                         toDateObjectsFromMonthDay={toDateObjectsFromMonthDay}
+                        getDisplayStatus={(studentId) => getDisplayStatus(studentId, selectedDate, classItem.class_id) as any}
+                        getDisplayStatusForCell={(studentId, idx) => {
+                          const { start } = getWeekRangeByIndex(selectedDate, idx)
+                          return getDisplayStatus(studentId, start, classItem.class_id) as any
+                        }}
+                        getAttendanceRecord={(studentId) => getAttendanceRecord(studentId, selectedDate, classItem.class_id) as any}
+                        updateAttendanceNote={updateAttendanceNote as any}
                       />
                     ))}
                 </div>
