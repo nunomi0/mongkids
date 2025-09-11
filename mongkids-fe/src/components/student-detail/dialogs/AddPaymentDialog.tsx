@@ -39,11 +39,17 @@ export default function AddPaymentDialog({ open, onOpenChange, newPayment, setNe
           </div>
           <div>
             <label className="text-xs text-muted-foreground">신발 할인</label>
-            <Input type="number" value={newPayment.shoe_discount} onChange={(e)=>setNewPayment((p:any)=>({...p, shoe_discount: e.target.value}))} />
+            <div className="flex gap-2 mt-1">
+              <Button type="button" variant={newPayment.shoe_discount==='0'?'default':'outline'} size="sm" onClick={()=>setNewPayment((p:any)=>({...p, shoe_discount: '0'}))}>0</Button>
+              <Button type="button" variant={newPayment.shoe_discount==='10000'?'default':'outline'} size="sm" onClick={()=>setNewPayment((p:any)=>({...p, shoe_discount: '10000'}))}>10,000</Button>
+            </div>
           </div>
           <div>
             <label className="text-xs text-muted-foreground">형제자매 할인</label>
-            <Input type="number" value={newPayment.sibling_discount} onChange={(e)=>setNewPayment((p:any)=>({...p, sibling_discount: e.target.value}))} />
+            <div className="flex gap-2 mt-1">
+              <Button type="button" variant={newPayment.sibling_discount==='0'?'default':'outline'} size="sm" onClick={()=>setNewPayment((p:any)=>({...p, sibling_discount: '0'}))}>0</Button>
+              <Button type="button" variant={newPayment.sibling_discount==='10000'?'default':'outline'} size="sm" onClick={()=>setNewPayment((p:any)=>({...p, sibling_discount: '10000'}))}>10,000</Button>
+            </div>
           </div>
           <div className="md:col-span-2">
             <label className="text-xs text-muted-foreground">추가 할인</label>

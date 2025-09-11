@@ -383,7 +383,7 @@ export default function DailyClassCard({
             )}
 
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-              <DialogContent className="sm:max-w-2xl">
+              <DialogContent className="h">
                 <DialogHeader>
                   <DialogTitle>학생 추가</DialogTitle>
                 </DialogHeader>

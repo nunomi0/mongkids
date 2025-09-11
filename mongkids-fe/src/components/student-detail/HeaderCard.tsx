@@ -15,17 +15,14 @@ export default function HeaderCard({ student, classTypes, onReload }: { student:
 
   return (
     <Card className="shrink-0">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm">프로필</CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border">
+        <div className="flex items-center justify-between p-4">
           <div>
             <div className="text-xl font-bold text-gray-900">{student.name}</div>
-            <div className="text-sm text-gray-600">{student.birth_date} ({getGradeLabel(student.birth_date)})</div>
-            <div className="text-sm text-gray-600">{classType ? `${classType.category} 주 ${classType.sessions_per_week}회` : '-'} ({scheduleText || '-'})</div>
-            <div className="text-sm text-gray-600"><span className="font-medium">전화번호:</span> {student.phone}</div>
-            <div className="text-sm text-gray-600"><span className="font-medium">등록일:</span> {student.registration_date}</div>
+            <div className="text-xs text-gray-500 mt-1">{student.birth_date} ({getGradeLabel(student.birth_date)}) · {student.gender}</div>
+            <div className="text-xs text-gray-500 mt-1">{classType ? `${classType.category} 주 ${classType.sessions_per_week}회` : '-'} ({scheduleText || '-'})</div>
+            <div className="text-xs text-gray-500 mt-1"><span className="font-medium">신발 사이즈:</span> {student.shoe_size || '-'}</div>
+            <div className="text-xs text-gray-500 mt-1"><span className="font-medium">전화번호:</span> {student.phone}</div>
+            <div className="text-xs text-gray-500 mt-1"><span className="font-medium">등록일:</span> {student.registration_date}</div>
           </div>
           <div className="flex items-center gap-3">
             {student.current_level && (
@@ -37,7 +34,6 @@ export default function HeaderCard({ student, classTypes, onReload }: { student:
             <Badge className={`text-sm px-3 py-1 ${statusColor}`}>{student.status}</Badge>
           </div>
         </div>
-      </CardContent>
     </Card>
   )
 }

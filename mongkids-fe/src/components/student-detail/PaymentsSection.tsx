@@ -34,17 +34,35 @@ export default function PaymentsSection({ payments, student, onReload }: { payme
                     yearMonth = `${d.getFullYear()}년 ${d.getMonth() + 1}월`
                   }
                   const methodText = payment.payment_method === 'account' ? '계좌이체' : payment.payment_method === 'card' ? '카드결제' : payment.payment_method === 'voucher' ? '스포츠바우처' : '미지정'
+                  const shoe = payment.shoe_discount || 0
+                  const sibling = payment.sibling_discount || 0
+                  const add = payment.additional_discount || 0
+                  const discountSum = shoe + sibling + add
+                  const gross = payment.total_amount + discountSum
+                  const keywordBadges: string[] = []
+                  if (shoe > 0) keywordBadges.push('신발')
+                  if (sibling > 0) keywordBadges.push('형제자매')
+                  if (add > 0) keywordBadges.push('추가')
                   return (
                     <TableRow key={payment.id} className="text-xs">
                       <TableCell className="py-1 px-1">{payment.payment_date}</TableCell>
                       <TableCell className="py-1 px-1 font-medium text-blue-600">{yearMonth}</TableCell>
-                      <TableCell className="py-1 px-1 font-medium">{payment.total_amount.toLocaleString()}원</TableCell>
+                      <TableCell className="py-1 px-1 font-medium">
+                        {payment.total_amount.toLocaleString()}원
+                      </TableCell>
                       <TableCell className="py-1 px-1"><Badge variant="outline" className="text-xs">{methodText}</Badge></TableCell>
                       <TableCell className="py-1 px-1">
-                        <div className="space-y-1">
-                          {/* 할인 상세는 필요시 확장 */}
-                          <div className="text-gray-500 text-xs">상세는 학생관리에서 확인</div>
-                        </div>
+                        {keywordBadges.length === 0 ? (
+                          <div className="text-gray-400">-</div>
+                        ) : (
+                          <div className="space-y-0.5">
+                            <div className="text-[11px] text-gray-600">
+                              {shoe > 0 && <span>신발 -{shoe.toLocaleString()} </span>}
+                              {sibling > 0 && <span>형제자매 -{sibling.toLocaleString()} </span>}
+                              {add > 0 && <span>추가 -{add.toLocaleString()}</span>}
+                            </div>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   )

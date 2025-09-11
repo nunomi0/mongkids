@@ -8,6 +8,7 @@ import { Button } from "./ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog"
 import { supabase } from "../lib/supabase"
 import StudentDetailModal from "./student-detail/StudentDetailModal"
+import AddStudentModal from "./student-detail/AddStudentModal"
 import { getGradeLabel } from "../utils/grade"
 import LevelBadge from "./LevelBadge"
 // 로컬 타입 정의 (supabase.ts의 api 의존 제거)
@@ -1001,189 +1002,7 @@ export default function StudentManagement() {
             <CardHeader>
           <div className="flex items-center justify-between gap-2">
             <CardTitle>학생 목록 ({getStatusFilterCount()}명)</CardTitle>
-            <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" variant="default">학생 추가</Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>학생 추가</DialogTitle>
-                </DialogHeader>
-                  <p className="text-sm text-black">
-                    <span className="text-red-500 font-semibold">*</span> 표시된 필드는 반드시 입력해야 합니다.
-                  </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">
-                      이름 <span className="text-red-500">*</span>
-                    </label>
-                    <Input 
-                      value={newStudent.name || ''} 
-                      onChange={(e)=>setNewStudent(s=>({...s, name: e.target.value}))}
-                      className={!newStudent.name && hasSubmitted ? 'border-red-300' : ''}
-                      placeholder="학생 이름을 입력하세요"
-                    />
-                    {!newStudent.name && hasSubmitted && (
-                      <p className="text-xs text-red-500">이름을 입력해주세요</p>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">성별</label>
-                    <select 
-                      value={newStudent.gender} 
-                      onChange={(e)=>setNewStudent(s=>({...s, gender: e.target.value as "남" | "여"}))}
-                      className="w-full p-2 border rounded"
-                    >
-                      <option value="남">남</option>
-                      <option value="여">여</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">
-                      생년월일 <span className="text-red-500">*</span>
-                    </label>
-                    <Input 
-                      value={newStudent.birth_date || ''} 
-                      onChange={(e)=>setNewStudent(s=>({...s, birth_date: e.target.value}))}
-                      type="date"
-                      className={!newStudent.birth_date && hasSubmitted ? 'border-red-300' : ''}
-                    />
-                    {!newStudent.birth_date && hasSubmitted && (
-                      <p className="text-xs text-red-500">생년월일을 선택해주세요</p>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">
-                      전화번호 <span className="text-red-500">*</span>
-                    </label>
-                    <Input 
-                      value={newStudent.phone || ''} 
-                      onChange={(e)=>setNewStudent(s=>({...s, phone: e.target.value}))}
-                      className={!newStudent.phone && hasSubmitted ? 'border-red-300' : ''}
-                      placeholder="010-1234-5678"
-                    />
-                    {!newStudent.phone && hasSubmitted && (
-                      <p className="text-xs text-red-500">전화번호를 입력해주세요</p>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">신발 사이즈</label>
-                    <Input 
-                      value={newStudent.shoe_size || ''} 
-                      onChange={(e)=>setNewStudent(s=>({...s, shoe_size: e.target.value}))}
-                      placeholder="220"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">
-                      등록반 <span className="text-red-500">*</span>
-                    </label>
-                    <select 
-                      value={newStudent.class_type_id} 
-                      onChange={(e)=>setNewStudent(s=>({...s, class_type_id: e.target.value}))}
-                      className={`w-full p-2 border rounded ${!newStudent.class_type_id && hasSubmitted ? 'border-red-300' : ''}`}
-                    >
-                      <option value="">등록반을 선택하세요</option>
-                      {classTypes.map((classType) => (
-                        <option key={classType.id} value={classType.id}>
-                          {classType.category} 주 {classType.sessions_per_week}회
-                        </option>
-                      ))}
-                    </select>
-                    {!newStudent.class_type_id && hasSubmitted && (
-                      <p className="text-xs text-red-500">등록반을 선택해주세요</p>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">현재 레벨</label>
-                    <select 
-                      value={newStudent.current_level} 
-                      onChange={(e)=>setNewStudent(s=>({...s, current_level: e.target.value as "" | "WHITE" | "YELLOW" | "GREEN" | "BLUE" | "RED" | "BLACK" | "GOLD"}))}
-                      className="w-full p-2 border rounded"
-                    >
-                      {levelOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">상태</label>
-                    <select 
-                      value={newStudent.status} 
-                      onChange={(e)=>setNewStudent(s=>({...s, status: e.target.value as StudentStatus}))}
-                      className="w-full p-2 border rounded"
-                    >
-                      {statusOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                
-                {/* 수업 시간 선택 */}
-                <div className="mt-4">
-                  <ScheduleSelector 
-                    schedules={selectedSchedules}
-                    onChange={setSelectedSchedules}
-                  />
-                  {newStudent.status === '재원' && hasSubmitted && (
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      {(() => {
-                        if (!newStudent.class_type_id) {
-                          return `⚠️ 재원 상태인 경우 등록반을 선택해야 합니다.`
-                        }
-                        
-                        const classType = classTypes.find(ct => ct.id === parseInt(newStudent.class_type_id))
-                        if (!classType) return null
-                        const isValid = validateSchedules(newStudent.class_type_id, selectedSchedules, newStudent.status)
-                        
-                        if (isValid) {
-                          return `✅ ${classType.category} 주 ${classType.sessions_per_week}회에 맞는 수업 시간이 설정되었습니다.`
-                        } else {
-                          // 구체적인 오류 메시지 생성
-                          let errorMessage = `⚠️ ${classType.category} 주 ${classType.sessions_per_week}회에 맞게 수업 시간을 설정해주세요.`
-                          
-                          if (selectedSchedules.length !== classType.sessions_per_week) {
-                            errorMessage += ` (현재 ${selectedSchedules.length}개)`
-                          }
-                          
-                          // 중복 시간 확인 (그룹은 상관없음)
-                          const timeSlots = selectedSchedules.map(s => `${s.weekday}-${s.time}`)
-                          const uniqueTimeSlots = new Set(timeSlots)
-                          if (timeSlots.length !== uniqueTimeSlots.size) {
-                            errorMessage += ` - 중복된 시간이 있습니다.`
-                          }
-                          
-                          return errorMessage
-                        }
-                      })()}
-                    </div>
-                  )}
-                </div>
-                <div className="flex justify-end gap-2 mt-4">
-                  <Button variant="outline" onClick={() => {
-                    setIsAddOpen(false)
-                    setHasSubmitted(false)
-                  }}>취소</Button>
-                  <Button 
-                    onClick={addStudent} 
-                    disabled={
-                      !newStudent.name || 
-                      !newStudent.birth_date || 
-                      !newStudent.phone ||
-                      !validateSchedules(newStudent.class_type_id, selectedSchedules, newStudent.status)
-                    }
-                  >
-                    추가
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Button size="sm" variant="default" onClick={() => setIsAddOpen(true)}>학생 추가</Button>
           </div>
           <div className="flex items-center space-x-4">
             {/* 검색 */}
@@ -1809,6 +1628,13 @@ export default function StudentManagement() {
           </div>
         </DialogContent>
       </Dialog>
+      
+      <AddStudentModal
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        classTypes={classTypes}
+        onSaved={loadStudents}
+      />
     </div>
   )
 }

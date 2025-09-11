@@ -66,7 +66,7 @@ export default function AttendanceSection({ attendance, attnYearMonth, setAttnYe
                     <TableCell className="p-2">
                       <div className="flex items-center gap-2">
                         <div className="text-ellipsis overflow-hidden whitespace-nowrap max-w-[180px]" title={a.note || ''}>
-                          {a.note || <span className="text-muted-foreground">-</span>}
+                          {a.note}
                         </div>
                         <MemoEditor
                           hasNote={!!a.note}

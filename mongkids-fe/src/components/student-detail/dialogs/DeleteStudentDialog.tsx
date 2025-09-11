@@ -18,7 +18,7 @@ export default function DeleteStudentDialog({ open, onOpenChange, confirmName, s
           <DialogTitle>학생 삭제 확인</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">정말로 <strong>{studentName}</strong> 학생을 삭제(퇴원 처리)하시겠습니까?</p>
+          <p className="text-sm text-muted-foreground">정말로 <strong>{studentName}</strong> 학생을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.</p>
           <p className="text-sm text-muted-foreground">확인을 위해 학생 이름을 입력하세요.</p>
           <Input value={confirmName} onChange={(e)=>setConfirmName(e.target.value)} placeholder="학생 이름" />
           <div className="flex justify-end gap-2">
