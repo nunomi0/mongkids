@@ -83,6 +83,8 @@ export default function DailyClassCard({
   const [isActionsOpen, setIsActionsOpen] = useState(false)
   const [isLinkOpen, setIsLinkOpen] = useState(false)
   const [pendingAddStudentId, setPendingAddStudentId] = useState<number | null>(null)
+  const [regularConfirmOpen, setRegularConfirmOpen] = useState(false)
+  const [regularPending, setRegularPending] = useState<{ id: number; name: string } | null>(null)
   const [sourceAttendances, setSourceAttendances] = useState<Array<{ id: number; status: '예정'|'출석'|'결석'; date: string; time: string; group_no: number }>>([])
   const [selectedSourceId, setSelectedSourceId] = useState<number | null>(null)
   const [linkMonth, setLinkMonth] = useState<string>(new Date().toISOString().slice(0,7))
@@ -248,6 +250,21 @@ export default function DailyClassCard({
     }
   }
 
+  const addRegular = async (studentId: number) => {
+    try {
+      const payload: any = { student_id: studentId, class_id: classItem.class_id, status: '예정', kind: '정규', makeup_of_attendance_id: null }
+      const { error } = await supabase
+        .from('attendance')
+        .upsert(payload, { onConflict: 'student_id,class_id' })
+      if (error) throw error
+      // 검색 결과에서 제거하여 중복 추가 방지
+      setSearchResults(prev => prev.filter(r => r.id !== studentId))
+      onClassUpdated && onClassUpdated()
+    } catch (e) {
+      console.error('정규 추가 실패:', e)
+    }
+  }
+
   return (
     <>
     <Card className={borderless ? 'border-none shadow-none' : undefined}>
@@ -347,7 +364,10 @@ export default function DailyClassCard({
                                   </div>
                                 </td>
                                 <td className="p-2 text-right">
-                                  <Button size="sm" variant="outline" onClick={() => openLinkModal(s.id)}>보강 편성</Button>
+                                  <div className="flex items-center justify-end gap-2">
+                                    <Button size="sm" variant="outline" onClick={() => { setRegularPending({ id: s.id, name: s.name }); setRegularConfirmOpen(true) }}>정규</Button>
+                                    <Button size="sm" variant="outline" onClick={() => openLinkModal(s.id)}>보강</Button>
+                                  </div>
                                 </td>
                               </tr>
                             ))
@@ -630,6 +650,33 @@ export default function DailyClassCard({
             <div className="flex justify-end gap-2 mt-3">
               <Button onClick={confirmAddMakeup} disabled={!selectedSourceId}>보강으로 편성</Button>
             </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+    {/* 정규 추가 확인 모달 */}
+    <Dialog open={regularConfirmOpen} onOpenChange={setRegularConfirmOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>정규 수업에 추가</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          <div>
+            {regularPending ? (
+              <div className="p-2 rounded border bg-muted/40">
+                {`${format(selectedDate, 'yyyy-MM-dd (E)', { locale: ko })} ${toHm(classItem.time)} 수업에 ${regularPending.name} 학생을 정규로 추가합니다.`}
+              </div>
+            ) : (
+              <div className="text-muted-foreground">학생을 선택하세요.</div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={()=> setRegularConfirmOpen(false)}>취소</Button>
+            <Button onClick={async ()=>{
+              if (!regularPending) return
+              await addRegular(regularPending.id)
+              setRegularConfirmOpen(false)
+            }}>확인</Button>
           </div>
         </div>
       </DialogContent>
