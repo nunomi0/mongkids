@@ -32,7 +32,7 @@ type StudentLevel = { id: number; student_id: number; level: Exclude<LevelType, 
 type Payment = { id: number; student_id: number; payment_date: string; total_amount: number; climbing_excluded: number; sibling_discount: number; additional_discount: number; created_at: string }
 type Attendance = { id: number; student_id: number; class_id: number; status: '예정' | '출석' | '결석' | '보강예정' | '보강완료'; is_makeup: boolean; memo: string | null; created_at: string; classes?: { date?: string; time?: string } }
 
-type StudentStatus = '재원' | '퇴원' | '휴원'
+type StudentStatus = '재원' | '퇴원' | '휴원' | '체험'
 
 export default function StudentManagement() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -112,6 +112,7 @@ export default function StudentManagement() {
         const { data, error } = await supabase
           .from('students')
           .select('*')
+          .neq('status', '체험')
           .order('created_at', { ascending: false })
         if (error) throw error
         return (data || []).map((s: any) => ({ ...s, last_payment_date: null, last_payment_amount: null }))

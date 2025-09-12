@@ -4,7 +4,7 @@ import { Home, BookOpen, Users, UserPlus } from "lucide-react"
 import MainDashboard from "./components/MainDashboard"
 import ClassManagement from "./components/ClassManagement"
 import StudentManagement from "./components/StudentManagement"
-import TrialManagement from "./components/TrialManagement"
+import TrialManagement from "./components/trial/TrialManagement"
 
 const menuItems = [
   {

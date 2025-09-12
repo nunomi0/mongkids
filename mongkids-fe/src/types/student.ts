@@ -1,4 +1,4 @@
-export type StudentStatus = '재원' | '휴원' | '퇴원'
+export type StudentStatus = '재원' | '휴원' | '퇴원' | '체험'
 
 export type StudentSchedule = {
   weekday: number
