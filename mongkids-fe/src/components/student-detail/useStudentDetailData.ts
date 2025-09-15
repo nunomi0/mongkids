@@ -16,11 +16,11 @@ export function useStudentDetailData(studentId: number | null, isOpen: boolean) 
       setLoading(true)
       const { data: studentData, error: sErr } = await supabase
         .from('students')
-        .select(`*, student_schedules ( weekday, time, group_no ), student_levels ( level, created_at )`)
+        .select(`*, student_schedules ( weekday, time, group_type ), student_levels ( level, created_at )`)
         .eq('id', id)
         .single()
       if (sErr) throw sErr
-      const schedules = (studentData?.student_schedules || []).map((s: any) => ({ weekday: s.weekday, time: s.time, group_no: s.group_no })) as StudentSchedule[]
+      const schedules = (studentData?.student_schedules || []).map((s: any) => ({ weekday: s.weekday, time: s.time, group_type: s.group_type })) as StudentSchedule[]
       setStudent({
         id: studentData.id,
         name: studentData.name,

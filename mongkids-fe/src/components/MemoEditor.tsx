@@ -58,7 +58,7 @@ export default function MemoEditor({ hasNote, note, onSave, studentId, classId, 
         ✎
       </button>
       <Dialog open={open} onOpenChange={(o)=>{ if(!o){ close() } }}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent type="s">
           <DialogHeader>
             { (label || meta) && (
               <DialogTitle>

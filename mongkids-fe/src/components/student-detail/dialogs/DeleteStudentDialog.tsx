@@ -13,7 +13,7 @@ export default function DeleteStudentDialog({ open, onOpenChange, confirmName, s
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent type="s">
         <DialogHeader>
           <DialogTitle>학생 삭제 확인</DialogTitle>
         </DialogHeader>

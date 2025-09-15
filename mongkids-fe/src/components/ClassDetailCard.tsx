@@ -6,6 +6,7 @@ import { Input } from "./ui/input"
 import { format } from "date-fns"
 import { ko } from "date-fns/locale"
 import { supabase } from "../lib/supabase"
+import { GroupType } from "../types/student"
 import LevelBadge from "./LevelBadge"
 import { getGradeLabel } from "../utils/grade"
 import { getLevelColor } from "../utils/levelColor"
@@ -32,7 +33,7 @@ interface DailyClassCardProps {
   classItem: {
     class_id: number
     time: string
-    group_no: number
+    group_type: GroupType
     students: Student[]
   }
   selectedDate: Date
@@ -84,7 +85,7 @@ export default function DailyClassCard({
     birth_date: string
     current_level: string | null
     class_type?: { category: string | null; sessions_per_week: number | null } | null
-    schedules: { weekday: number; time: string; group_no: number }[]
+    schedules: { weekday: number; time: string; group_type: GroupType }[]
   }[]>([])
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isRemoveOpen, setIsRemoveOpen] = useState(false)
@@ -93,7 +94,7 @@ export default function DailyClassCard({
   const [pendingAddStudentId, setPendingAddStudentId] = useState<number | null>(null)
   const [regularConfirmOpen, setRegularConfirmOpen] = useState(false)
   const [regularPending, setRegularPending] = useState<{ id: number; name: string } | null>(null)
-  const [sourceAttendances, setSourceAttendances] = useState<Array<{ id: number; status: '예정'|'출석'|'결석'; date: string; time: string; group_no: number }>>([])
+  const [sourceAttendances, setSourceAttendances] = useState<Array<{ id: number; status: '예정'|'출석'|'결석'; date: string; time: string; group_type: GroupType }>>([])
   const [selectedSourceId, setSelectedSourceId] = useState<number | null>(null)
   const [linkMonth, setLinkMonth] = useState<string>(new Date().toISOString().slice(0,7))
   const [monthOptions, setMonthOptions] = useState<Array<{ value: string; label: string }>>([])
@@ -117,12 +118,12 @@ export default function DailyClassCard({
   const [isTrialDetailOpen, setIsTrialDetailOpen] = useState(false)
   const [selectedTrialId, setSelectedTrialId] = useState<number | null>(null)
 
-  // 체험자 목록 로드 (group_no가 3인 경우)
+  // 체험자 목록 로드 (group_type이 '체험'인 경우)
   useEffect(() => {
-    if (classItem.group_no === 3) {
+    if (classItem.group_type === '체험') {
       loadTrialReservations()
     }
-  }, [classItem.class_id, classItem.group_no])
+  }, [classItem.class_id, classItem.group_type])
 
   const loadTrialReservations = async () => {
     try {
@@ -254,7 +255,7 @@ export default function DailyClassCard({
           current_level,
           status,
           class_types:class_types(category, sessions_per_week),
-          student_schedules:student_schedules(weekday, time, group_no)
+          student_schedules:student_schedules(weekday, time, group_type)
         `)
         .ilike('name', `%${studentSearch}%`)
         .eq('status', '재원')
@@ -268,7 +269,7 @@ export default function DailyClassCard({
         birth_date: s.birth_date,
         current_level: s.current_level,
         class_type: s.class_types ? { category: s.class_types.category, sessions_per_week: s.class_types.sessions_per_week } : undefined,
-        schedules: (s.student_schedules || []).map((sch: any) => ({ weekday: sch.weekday, time: sch.time, group_no: sch.group_no }))
+        schedules: (s.student_schedules || []).map((sch: any) => ({ weekday: sch.weekday, time: sch.time, group_type: sch.group_type }))
       }))
       if (!cancelled) setSearchResults(filtered)
     }
@@ -284,7 +285,7 @@ export default function DailyClassCard({
     const toStr = `${to.getFullYear()}-${String(to.getMonth()+1).padStart(2,'0')}-${String(to.getDate()).padStart(2,'0')}`
     const { data, error } = await supabase
       .from('attendance')
-      .select('id, status, kind, classes:classes(date, time, group_no)')
+      .select('id, status, kind, classes:classes(date, time, group_type)')
       .eq('student_id', studentId)
       .is('makeup_of_attendance_id', null)
       .in('status', ['예정','결석'])
@@ -297,7 +298,7 @@ export default function DailyClassCard({
       status: a.status as '예정'|'출석'|'결석',
       date: (a.classes!.date as string),
       time: (a.classes!.time as string),
-      group_no: ((a.classes!.group_no as number) || 1),
+      group_type: ((a.classes!.group_type as GroupType) || '일반1'),
     }))
     setSourceAttendances(list)
   }
@@ -416,7 +417,7 @@ export default function DailyClassCard({
             )}
 
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-              <DialogContent className="h">
+              <DialogContent type="s">
                 <DialogHeader>
                   <DialogTitle>학생 추가</DialogTitle>
                 </DialogHeader>
@@ -469,7 +470,7 @@ export default function DailyClassCard({
                                   <div className="flex flex-wrap gap-1">
                                     {s.schedules.length > 0 ? s.schedules.map((sch, i) => (
                                       <span key={i} className="px-2 py-0.5 rounded border bg-background text-xs">
-                                        {['월','화','수','목','금','토','일'][sch.weekday === 0 ? 6 : sch.weekday - 1]} {toHm(sch.time)} (그룹 {sch.group_no})
+                                        {['월','화','수','목','금','토','일'][sch.weekday === 0 ? 6 : sch.weekday - 1]} {toHm(sch.time)} ({sch.group_type})
                                       </span>
                                     )) : <span className="text-muted-foreground">스케줄 없음</span>}
                                   </div>
@@ -499,7 +500,7 @@ export default function DailyClassCard({
               </DialogContent>
             </Dialog>
             <Dialog open={isRemoveOpen} onOpenChange={setIsRemoveOpen}>
-              <DialogContent className="sm:max-w-md">
+              <DialogContent type="s">
                 <DialogHeader>
                   <DialogTitle>학생 삭제</DialogTitle>
                 </DialogHeader>
@@ -562,19 +563,19 @@ export default function DailyClassCard({
           </div>
         </CardTitle>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <span>그룹 {classItem.group_no}</span>
+          <span>{classItem.group_type}</span>
         </div>
       </CardHeader>
       <CardContent>
         <div>
           <div className="flex items-center justify-between mb-2">
             <p className="font-medium">
-              {classItem.group_no === 3 ? `체험자 (${trialReservations.length}명)` : `참여 학생 (${classItem.students.length}명)`}
+              {classItem.group_type === '체험' ? `체험자 (${trialReservations.length}명)` : `참여 학생 (${classItem.students.length}명)`}
             </p>
           </div>
           <div className="space-y-3">
-            {/* 체험자 목록 (group_no가 3인 경우) */}
-            {classItem.group_no === 3 ? (
+            {/* 체험자 목록 (group_type이 '체험'인 경우) */}
+            {classItem.group_type === '체험' ? (
               trialReservations.map((trial) => (
                 <div 
                   key={trial.id}
@@ -794,7 +795,7 @@ export default function DailyClassCard({
 
     {/* 보강 수업 편성 모달 */}
     <Dialog open={isLinkOpen} onOpenChange={setIsLinkOpen}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent type="m">
         <DialogHeader>
           <DialogTitle>보강 수업 편성</DialogTitle>
         </DialogHeader>
@@ -840,7 +841,7 @@ export default function DailyClassCard({
                     <tr key={a.id} className={`border-t cursor-pointer ${selectedSourceId === a.id ? 'bg-gray-100' : 'bg-gray-50'}`} onClick={()=> setSelectedSourceId(a.id)}>
                       <td className="p-2 whitespace-nowrap">{format(new Date(a.date), 'yyyy-MM-dd', { locale: ko })}</td>
                       <td className="p-2 whitespace-nowrap">{a.time?.slice(0,5)}</td>
-                      <td className="p-2 whitespace-nowrap">{a.group_no}</td>
+                      <td className="p-2 whitespace-nowrap">{a.group_type}</td>
                       <td className="p-2 whitespace-nowrap">{a.status}</td>
                     </tr>
                   )) : (
@@ -871,7 +872,7 @@ export default function DailyClassCard({
     </Dialog>
     {/* 정규 추가 확인 모달 */}
     <Dialog open={regularConfirmOpen} onOpenChange={setRegularConfirmOpen}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent type="s">
         <DialogHeader>
           <DialogTitle>정규 수업에 추가</DialogTitle>
         </DialogHeader>

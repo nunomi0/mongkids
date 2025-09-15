@@ -14,7 +14,7 @@ export default function EditStudentDialog({ open, onOpenChange, editStudent, set
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent type="s">
         <DialogHeader>
           <DialogTitle>학생 정보 수정</DialogTitle>
         </DialogHeader>

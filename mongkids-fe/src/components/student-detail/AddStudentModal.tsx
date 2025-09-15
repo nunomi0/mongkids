@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog"
 import { Input } from "../ui/input"
 import { Button } from "../ui/button"
 import { supabase } from "../../lib/supabase"
-import { ClassType } from "../../types/student"
+import { ClassType, GroupType } from "../../types/student"
 
 type Props = {
   isOpen: boolean
@@ -30,7 +30,7 @@ export default function AddStudentModal({ isOpen, onClose, classTypes, onSaved }
     status: '재원',
     shoe_size: ''
   })
-  const [schedules, setSchedules] = useState<Array<{ weekday: number; time: string; group_no: number }>>([])
+  const [schedules, setSchedules] = useState<Array<{ weekday: number; time: string; group_type: GroupType }>>([])
   const [levelDates, setLevelDates] = useState<Record<string, string>>({})
   const weekdayNames = ['월','화','수','목','금','토','일']
   const [hasSubmitted, setHasSubmitted] = useState(false)
@@ -47,7 +47,7 @@ export default function AddStudentModal({ isOpen, onClose, classTypes, onSaved }
     const keySet = new Set<string>()
     let hasDuplicate = false
     for (const s of schedules) {
-      const key = `${s.weekday}-${s.time}-${s.group_no}`
+      const key = `${s.weekday}-${s.time}-${s.group_type}`
       if (keySet.has(key)) { hasDuplicate = true; break }
       keySet.add(key)
     }
@@ -57,9 +57,9 @@ export default function AddStudentModal({ isOpen, onClose, classTypes, onSaved }
     return { hasDuplicate, countMismatch, required: required ?? null }
   }, [schedules, selectedClassType])
 
-  const addSchedule = () => setSchedules(prev => [...prev, { weekday: 0, time: '00:00', group_no: 1 }])
+  const addSchedule = () => setSchedules(prev => [...prev, { weekday: 0, time: '00:00', group_type: '일반1' }])
   const removeSchedule = (idx: number) => setSchedules(prev => prev.filter((_, i) => i !== idx))
-  const updateSchedule = (idx: number, key: 'weekday'|'time'|'group_no', value: number|string) => setSchedules(prev => {
+  const updateSchedule = (idx: number, key: 'weekday'|'time'|'group_type', value: number|string) => setSchedules(prev => {
     const next = [...prev]; (next[idx] as any)[key] = value; return next
   })
 
@@ -95,10 +95,14 @@ export default function AddStudentModal({ isOpen, onClose, classTypes, onSaved }
           student_id: studentData.id, 
           weekday: s.weekday, 
           time: s.time, 
-          group_no: s.group_no 
+          group_type: s.group_type 
         }))
+        console.log('AddStudentModal - 삽입할 스케줄 데이터:', scheduleRows)
         const { error: scheduleError } = await supabase.from('student_schedules').insert(scheduleRows)
-        if (scheduleError) throw scheduleError
+        if (scheduleError) {
+          console.error('AddStudentModal - 스케줄 삽입 에러:', scheduleError)
+          throw scheduleError
+        }
       }
 
       // 레벨 이력 생성
@@ -133,7 +137,7 @@ export default function AddStudentModal({ isOpen, onClose, classTypes, onSaved }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className>
+      <DialogContent type="m">
         <DialogHeader>
           <DialogTitle>학생 추가</DialogTitle>
         </DialogHeader>
@@ -235,8 +239,8 @@ export default function AddStudentModal({ isOpen, onClose, classTypes, onSaved }
                       return <option key={i} value={`${hour}:00`}>{hour}:00</option>
                     })}
                   </select>
-                  <select value={sch.group_no} onChange={(e)=>updateSchedule(idx, 'group_no', parseInt(e.target.value))} className="p-1 text-sm border rounded">
-                    {[1,2,3].map(n => (<option key={n} value={n}>{n}반</option>))}
+                  <select value={sch.group_type} onChange={(e)=>updateSchedule(idx, 'group_type', e.target.value)} className="p-1 text-sm border rounded">
+                    {(['일반1', '일반2', '스페셜', '체험'] as GroupType[]).map(type => (<option key={type} value={type}>{type}</option>))}
                   </select>
                   <Button type="button" variant="outline" size="sm" className="text-red-600" onClick={()=>removeSchedule(idx)}>삭제</Button>
                 </div>

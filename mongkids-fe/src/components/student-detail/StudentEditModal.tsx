@@ -4,7 +4,7 @@ import { Input } from "../ui/input"
 import { Button } from "../ui/button"
 import { Badge } from "../ui/badge"
 import { supabase } from "../../lib/supabase"
-import { ClassType, Student, StudentSchedule } from "../../types/student"
+import { ClassType, Student, StudentSchedule, GroupType } from "../../types/student"
 import DeleteStudentDialog from "./dialogs/DeleteStudentDialog"
 
 type Props = {
@@ -18,7 +18,7 @@ type Props = {
 
 export default function StudentEditModal({ isOpen, onClose, student, classTypes, onSaved, onDeleted }: Props) {
   const [form, setForm] = useState<{ name: string; birth_date: string; phone: string; class_type_id: string; gender: '남'|'여'; status: '재원'|'휴원'|'퇴원'; shoe_size: string } | null>(null)
-  const [schedules, setSchedules] = useState<Array<{ weekday: number; time: string; group_no: number }>>([])
+  const [schedules, setSchedules] = useState<Array<{ weekday: number; time: string; group_type: GroupType }>>([])
   const [levelDates, setLevelDates] = useState<Record<string, string>>({})
   const weekdayNames = ['월','화','수','목','금','토','일']
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -34,7 +34,7 @@ export default function StudentEditModal({ isOpen, onClose, student, classTypes,
     const keySet = new Set<string>()
     let hasDuplicate = false
     for (const s of schedules) {
-      const key = `${s.weekday}-${s.time}-${s.group_no}`
+      const key = `${s.weekday}-${s.time}-${s.group_type}`
       if (keySet.has(key)) { hasDuplicate = true; break }
       keySet.add(key)
     }
@@ -55,7 +55,7 @@ export default function StudentEditModal({ isOpen, onClose, student, classTypes,
       status: student.status,
       shoe_size: student.shoe_size ? String(student.shoe_size) : ''
     })
-    setSchedules((student.schedules || []).map(s => ({ weekday: s.weekday, time: s.time, group_no: s.group_no })))
+    setSchedules((student.schedules || []).map(s => ({ weekday: s.weekday, time: s.time, group_type: s.group_type })))
     ;(async ()=>{
       if (!student) return
       const { data, error } = await supabase.from('student_levels').select('level, acquired_date').eq('student_id', student.id)
@@ -69,9 +69,9 @@ export default function StudentEditModal({ isOpen, onClose, student, classTypes,
     })()
   }, [student])
 
-  const addSchedule = () => setSchedules(prev => [...prev, { weekday: 0, time: '00:00', group_no: 1 }])
+  const addSchedule = () => setSchedules(prev => [...prev, { weekday: 0, time: '00:00', group_type: '일반1' }])
   const removeSchedule = (idx: number) => setSchedules(prev => prev.filter((_, i) => i !== idx))
-  const updateSchedule = (idx: number, key: 'weekday'|'time'|'group_no', value: number|string) => setSchedules(prev => {
+  const updateSchedule = (idx: number, key: 'weekday'|'time'|'group_type', value: number|string) => setSchedules(prev => {
     const next = [...prev]; (next[idx] as any)[key] = value; return next
   })
 
@@ -96,10 +96,14 @@ export default function StudentEditModal({ isOpen, onClose, student, classTypes,
       {
         const { error } = await supabase.from('student_schedules').delete().eq('student_id', student.id)
         if (error) throw error
-        const rows = schedules.map(s => ({ student_id: student.id, weekday: s.weekday, time: s.time, group_no: s.group_no }))
+        const rows = schedules.map(s => ({ student_id: student.id, weekday: s.weekday, time: s.time, group_type: s.group_type }))
+        console.log('삽입할 스케줄 데이터:', rows)
         if (rows.length) {
           const { error: insErr } = await supabase.from('student_schedules').insert(rows as any)
-          if (insErr) throw insErr
+          if (insErr) {
+            console.error('스케줄 삽입 에러:', insErr)
+            throw insErr
+          }
         }
       }
       // 레벨 이력 재작성(간단 처리)
@@ -119,6 +123,7 @@ export default function StudentEditModal({ isOpen, onClose, student, classTypes,
       onClose()
     } catch (e) {
       console.error('학생 저장 실패:', e)
+      console.error('에러 상세:', JSON.stringify(e, null, 2))
     }
   }
 
@@ -142,8 +147,8 @@ export default function StudentEditModal({ isOpen, onClose, student, classTypes,
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="h-full">
-        {!form ? (
+<DialogContent type="m">
+{!form ? (
           <div className="p-6 text-center text-muted-foreground">불러오는 중...</div>
         ) : (
           <div className="flex flex-col gap-4">
@@ -215,8 +220,8 @@ export default function StudentEditModal({ isOpen, onClose, student, classTypes,
                         return <option key={i} value={`${hour}:00`}>{hour}:00</option>
                       })}
                     </select>
-                    <select value={sch.group_no} onChange={(e)=>updateSchedule(idx, 'group_no', parseInt(e.target.value))} className="p-1 text-sm border rounded">
-                      {[1,2,3].map(n => (<option key={n} value={n}>{n}반</option>))}
+                    <select value={sch.group_type} onChange={(e)=>updateSchedule(idx, 'group_type', e.target.value)} className="p-1 text-sm border rounded">
+                      {(['일반1', '일반2', '스페셜', '체험'] as GroupType[]).map(type => (<option key={type} value={type}>{type}</option>))}
                     </select>
                     <Button type="button" variant="outline" size="sm" className="text-red-600" onClick={()=>removeSchedule(idx)}>삭제</Button>
                   </div>

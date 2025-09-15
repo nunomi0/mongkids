@@ -28,8 +28,8 @@ export default function StudentDetailModal({ isOpen, onClose, studentId }: { isO
   return (
     <>
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="h-full">
-        {loading ? (
+    <DialogContent type="m">
+    {loading ? (
           <div className="p-6 text-center text-muted-foreground"></div>
         ) : student ? (
           <div className="flex flex-col gap-4">

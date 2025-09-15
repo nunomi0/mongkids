@@ -7,6 +7,7 @@ import { Search, Edit, Trash2, Users, UserX, Clock, Plus } from "lucide-react"
 import { Button } from "./ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog"
 import { supabase } from "../lib/supabase"
+import { GroupType } from "../types/student"
 import StudentDetailModal from "./student-detail/StudentDetailModal"
 import AddStudentModal from "./student-detail/AddStudentModal"
 import { getGradeLabel } from "../utils/grade"
@@ -27,7 +28,7 @@ type Student = {
   created_at: string
 }
 type ClassType = { id: number; category: string; sessions_per_week: number }
-type StudentSchedule = { id?: number; student_id: number; weekday: number; time: string; group_no: number; created_at?: string }
+type StudentSchedule = { id?: number; student_id: number; weekday: number; time: string; group_type: GroupType; created_at?: string }
 type StudentLevel = { id: number; student_id: number; level: Exclude<LevelType, null>; acquired_date: string; created_at?: string }
 type Payment = { id: number; student_id: number; payment_date: string; total_amount: number; climbing_excluded: number; sibling_discount: number; additional_discount: number; created_at: string }
 type Attendance = { id: number; student_id: number; class_id: number; status: '예정' | '출석' | '결석' | '보강예정' | '보강완료'; is_makeup: boolean; memo: string | null; created_at: string; classes?: { date?: string; time?: string } }
@@ -72,7 +73,7 @@ export default function StudentManagement() {
   const [studentAttendance, setStudentAttendance] = useState<Attendance[]>([])
 
   // 수업 시간 선택 상태
-  const [selectedSchedules, setSelectedSchedules] = useState<Array<{ weekday: number; time: string; group_no: number }>>([])
+  const [selectedSchedules, setSelectedSchedules] = useState<Array<{ weekday: number; time: string; group_type: GroupType }>>([])
   
   // 폼 제출 시도 상태 (에러 메시지 표시용)
   const [hasSubmitted, setHasSubmitted] = useState(false)
@@ -417,52 +418,52 @@ export default function StudentManagement() {
     const classType = classTypes.find(ct => ct.id === classTypeId)
     if (!classType) return []
     
-    const schedules: Array<{ student_id: number; weekday: number; time: string; group_no: number }> = []
+    const schedules: Array<{ student_id: number; weekday: number; time: string; group_type: GroupType }> = []
     
     // 수강 종류에 따른 기본 스케줄
     if (classType.category === '키즈') {
       if (classType.sessions_per_week === 1) {
-        schedules.push({ student_id: studentId, weekday: 5, time: '11:00', group_no: 1 }) // 토요일 11시
+        schedules.push({ student_id: studentId, weekday: 5, time: '11:00', group_type: '일반1' }) // 토요일 11시
       } else if (classType.sessions_per_week === 2) {
-        schedules.push({ student_id: studentId, weekday: 5, time: '11:00', group_no: 1 }) // 토요일 11시
-        schedules.push({ student_id: studentId, weekday: 6, time: '14:00', group_no: 1 }) // 일요일 14시
+        schedules.push({ student_id: studentId, weekday: 5, time: '11:00', group_type: '일반1' }) // 토요일 11시
+        schedules.push({ student_id: studentId, weekday: 6, time: '14:00', group_type: '일반1' }) // 일요일 14시
       } else if (classType.sessions_per_week === 3) {
-        schedules.push({ student_id: studentId, weekday: 0, time: '16:00', group_no: 1 }) // 월요일 16시
-        schedules.push({ student_id: studentId, weekday: 2, time: '16:00', group_no: 1 }) // 수요일 16시
-        schedules.push({ student_id: studentId, weekday: 4, time: '16:00', group_no: 1 }) // 금요일 16시
+        schedules.push({ student_id: studentId, weekday: 0, time: '16:00', group_type: '일반1' }) // 월요일 16시
+        schedules.push({ student_id: studentId, weekday: 2, time: '16:00', group_type: '일반1' }) // 수요일 16시
+        schedules.push({ student_id: studentId, weekday: 4, time: '16:00', group_type: '일반1' }) // 금요일 16시
       }
     } else if (classType.category === '청소년') {
       if (classType.sessions_per_week === 1) {
-        schedules.push({ student_id: studentId, weekday: 5, time: '14:00', group_no: 1 }) // 토요일 14시
+        schedules.push({ student_id: studentId, weekday: 5, time: '14:00', group_type: '일반1' }) // 토요일 14시
       } else if (classType.sessions_per_week === 2) {
-        schedules.push({ student_id: studentId, weekday: 5, time: '14:00', group_no: 1 }) // 토요일 14시
-        schedules.push({ student_id: studentId, weekday: 6, time: '17:00', group_no: 1 }) // 일요일 17시
+        schedules.push({ student_id: studentId, weekday: 5, time: '14:00', group_type: '일반1' }) // 토요일 14시
+        schedules.push({ student_id: studentId, weekday: 6, time: '17:00', group_type: '일반1' }) // 일요일 17시
       } else if (classType.sessions_per_week === 3) {
-        schedules.push({ student_id: studentId, weekday: 1, time: '17:00', group_no: 1 }) // 화요일 17시
-        schedules.push({ student_id: studentId, weekday: 3, time: '17:00', group_no: 1 }) // 목요일 17시
-        schedules.push({ student_id: studentId, weekday: 5, time: '17:00', group_no: 1 }) // 토요일 17시
+        schedules.push({ student_id: studentId, weekday: 1, time: '17:00', group_type: '일반1' }) // 화요일 17시
+        schedules.push({ student_id: studentId, weekday: 3, time: '17:00', group_type: '일반1' }) // 목요일 17시
+        schedules.push({ student_id: studentId, weekday: 5, time: '17:00', group_type: '일반1' }) // 토요일 17시
       }
     } else if (classType.category === '여성') {
       if (classType.sessions_per_week === 1) {
-        schedules.push({ student_id: studentId, weekday: 5, time: '17:00', group_no: 1 }) // 토요일 17시
+        schedules.push({ student_id: studentId, weekday: 5, time: '17:00', group_type: '일반1' }) // 토요일 17시
       } else if (classType.sessions_per_week === 2) {
-        schedules.push({ student_id: studentId, weekday: 5, time: '17:00', group_no: 1 }) // 토요일 17시
-        schedules.push({ student_id: studentId, weekday: 6, time: '20:00', group_no: 1 }) // 일요일 20시
+        schedules.push({ student_id: studentId, weekday: 5, time: '17:00', group_type: '일반1' }) // 토요일 17시
+        schedules.push({ student_id: studentId, weekday: 6, time: '20:00', group_type: '일반1' }) // 일요일 20시
       } else if (classType.sessions_per_week === 3) {
-        schedules.push({ student_id: studentId, weekday: 0, time: '20:00', group_no: 1 }) // 월요일 20시
-        schedules.push({ student_id: studentId, weekday: 2, time: '20:00', group_no: 1 }) // 수요일 20시
-        schedules.push({ student_id: studentId, weekday: 4, time: '20:00', group_no: 1 }) // 금요일 20시
+        schedules.push({ student_id: studentId, weekday: 0, time: '20:00', group_type: '일반1' }) // 월요일 20시
+        schedules.push({ student_id: studentId, weekday: 2, time: '20:00', group_type: '일반1' }) // 수요일 20시
+        schedules.push({ student_id: studentId, weekday: 4, time: '20:00', group_type: '일반1' }) // 금요일 20시
       }
     } else if (classType.category === '스페셜') {
       if (classType.sessions_per_week === 1) {
-        schedules.push({ student_id: studentId, weekday: 5, time: '10:00', group_no: 1 }) // 토요일 10시
+        schedules.push({ student_id: studentId, weekday: 5, time: '10:00', group_type: '일반1' }) // 토요일 10시
       } else if (classType.sessions_per_week === 2) {
-        schedules.push({ student_id: studentId, weekday: 5, time: '10:00', group_no: 1 }) // 토요일 10시
-        schedules.push({ student_id: studentId, weekday: 6, time: '13:00', group_no: 1 }) // 일요일 13시
+        schedules.push({ student_id: studentId, weekday: 5, time: '10:00', group_type: '일반1' }) // 토요일 10시
+        schedules.push({ student_id: studentId, weekday: 6, time: '13:00', group_type: '일반1' }) // 일요일 13시
       } else if (classType.sessions_per_week === 3) {
-        schedules.push({ student_id: studentId, weekday: 1, time: '13:00', group_no: 1 }) // 화요일 13시
-        schedules.push({ student_id: studentId, weekday: 3, time: '13:00', group_no: 1 }) // 목요일 13시
-        schedules.push({ student_id: studentId, weekday: 5, time: '13:00', group_no: 1 }) // 토요일 13시
+        schedules.push({ student_id: studentId, weekday: 1, time: '13:00', group_type: '일반1' }) // 화요일 13시
+        schedules.push({ student_id: studentId, weekday: 3, time: '13:00', group_type: '일반1' }) // 목요일 13시
+        schedules.push({ student_id: studentId, weekday: 5, time: '13:00', group_type: '일반1' }) // 토요일 13시
       }
     }
     
@@ -608,7 +609,7 @@ export default function StudentManagement() {
       setSelectedSchedules(schedules.map(s => ({
         weekday: s.weekday,
         time: s.time,
-        group_no: s.group_no
+        group_type: s.group_type
       })))
     } catch (error) {
       console.error('Error loading student schedules:', error)
@@ -835,8 +836,8 @@ export default function StudentManagement() {
 
   // 수업 시간 선택 컴포넌트
   const ScheduleSelector = ({ schedules, onChange }: { 
-    schedules: Array<{ weekday: number; time: string; group_no: number }>
-    onChange: (schedules: Array<{ weekday: number; time: string; group_no: number }>) => void 
+    schedules: Array<{ weekday: number; time: string; group_type: GroupType }>
+    onChange: (schedules: Array<{ weekday: number; time: string; group_type: GroupType }>) => void 
   }) => {
     const weekdayNames = ['월', '화', '수', '목', '금', '토', '일']
     const timeOptions = [
@@ -845,14 +846,14 @@ export default function StudentManagement() {
     ]
 
     const addSchedule = () => {
-      onChange([...schedules, { weekday: 0, time: '11:00', group_no: 1 }])
+      onChange([...schedules, { weekday: 0, time: '11:00', group_type: '일반1' }])
     }
 
     const removeSchedule = (index: number) => {
       onChange(schedules.filter((_, i) => i !== index))
     }
 
-    const updateSchedule = (index: number, field: 'weekday' | 'time' | 'group_no', value: number | string) => {
+    const updateSchedule = (index: number, field: 'weekday' | 'time' | 'group_type', value: number | string) => {
       const newSchedules = [...schedules]
       newSchedules[index] = { ...newSchedules[index], [field]: value }
       onChange(newSchedules)
@@ -890,13 +891,13 @@ export default function StudentManagement() {
             </select>
             
             <select
-              value={schedule.group_no}
-              onChange={(e) => updateSchedule(index, 'group_no', parseInt(e.target.value))}
+              value={schedule.group_type}
+              onChange={(e) => updateSchedule(index, 'group_type', e.target.value)}
               className="w-16 p-1 text-sm border rounded"
             >
-              <option value={1}>1반</option>
-              <option value={2}>2반</option>
-              <option value={3}>3반</option>
+              {(['일반1', '일반2', '스페셜', '체험'] as GroupType[]).map(type => (
+                <option key={type} value={type}>{type}</option>
+              ))}
             </select>
             
             <Button
@@ -958,7 +959,7 @@ export default function StudentManagement() {
   }
 
   // 수업 시간 유효성 검사
-  const validateSchedules = (classTypeId: string | number | null, schedules: Array<{ weekday: number; time: string; group_no: number }>, status: StudentStatus) => {
+  const validateSchedules = (classTypeId: string | number | null, schedules: Array<{ weekday: number; time: string; group_type: GroupType }>, status: StudentStatus) => {
     // 휴원이나 퇴원인 경우 스케줄 검증 불필요
     if (status !== '재원') return true
     
@@ -1211,7 +1212,7 @@ export default function StudentManagement() {
 
       {/* 삭제 확인 다이얼로그 */}
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-              <DialogContent>
+              <DialogContent type="s">
                 <DialogHeader>
             <DialogTitle>학생 삭제 확인</DialogTitle>
                 </DialogHeader>
@@ -1248,7 +1249,7 @@ export default function StudentManagement() {
 
       {/* 학생 수정 다이얼로그 */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent type="m">
           <DialogHeader>
             <DialogTitle>학생 정보 수정</DialogTitle>
           </DialogHeader>
@@ -1427,7 +1428,7 @@ export default function StudentManagement() {
 
       {/* 레벨 이력 수정 다이얼로그 */}
       <Dialog open={isLevelEditOpen} onOpenChange={setIsLevelEditOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent type="m">
                 <DialogHeader>
             <DialogTitle>레벨 이력 수정 - {selectedStudent?.name}</DialogTitle>
                 </DialogHeader>
@@ -1483,7 +1484,7 @@ export default function StudentManagement() {
 
       {/* 결제 추가 다이얼로그 */}
       <Dialog open={isPaymentAddOpen} onOpenChange={setIsPaymentAddOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent type="s">
           <DialogHeader>
             <DialogTitle>결제 내역 추가 - {selectedStudent?.name}</DialogTitle>
           </DialogHeader>

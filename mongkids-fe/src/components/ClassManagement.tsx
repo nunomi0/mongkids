@@ -14,6 +14,7 @@ import { format } from "date-fns"
 import { ko } from "date-fns/locale"
 import { startOfWeek, endOfWeek, startOfMonth } from "date-fns"
 import { supabase } from "../lib/supabase"
+import { GroupType } from "../types/student"
 import { Input } from "./ui/input"
 import StudentDetailModal from "./student-detail/StudentDetailModal"
 import ClassDetailCard from "./ClassDetailCard"
@@ -45,19 +46,19 @@ export default function ClassManagement() {
   const [realSchedule, setRealSchedule] = useState<{
     date: string
     time: string
-    group_no: number
+    group_type: GroupType
     class_id: number
     students: { id: number; name: string; grade?: string; level?: string; isTrial?: boolean }[]
   }[]>([])
   const [isManageOpen, setIsManageOpen] = useState(false)
-  const [manageClass, setManageClass] = useState<{ class_id: number; date: string; time: string; group_no: number; students: { id: number; name: string }[] } | null>(null)
+  const [manageClass, setManageClass] = useState<{ class_id: number; date: string; time: string; group_type: GroupType; students: { id: number; name: string }[] } | null>(null)
   const [studentSearch, setStudentSearch] = useState("")
   const [candidateStudents, setCandidateStudents] = useState<{ id: number; name: string }[]>([])
   const [allStudents, setAllStudents] = useState<any[]>([])
   const [dailyClasses, setDailyClasses] = useState<{
     class_id: number
     time: string
-    group_no: number
+    group_type: GroupType
     students: { id: number; name: string; grade: string; level: string }[]
   }[]>([])
   // attendance 상세 맵과 정규→보강 링크 맵
@@ -72,7 +73,7 @@ export default function ClassManagement() {
   const [selectedTrialId, setSelectedTrialId] = useState<number | null>(null)
   // 주차별 수업 상세
   const [isClassDetailOpen, setIsClassDetailOpen] = useState(false)
-  const [selectedClassForDetail, setSelectedClassForDetail] = useState<{ class_id: number; date: string; time: string; group_no: number; students: { id: number; name: string }[] } | null>(null)
+  const [selectedClassForDetail, setSelectedClassForDetail] = useState<{ class_id: number; date: string; time: string; group_type: GroupType; students: { id: number; name: string }[] } | null>(null)
   const [selectedClassDate, setSelectedClassDate] = useState<Date | null>(null)
   
   
@@ -114,14 +115,14 @@ export default function ClassManagement() {
 
       // 2) 해당 날짜의 클래스 upsert
       const uniqueKey = new Set<string>()
-      const classesForDay: { date: string; time: string; group_no: number }[] = []
+      const classesForDay: { date: string; time: string; group_type: GroupType }[] = []
       schedules.forEach(s => {
         const time = s.time
-        const group = s.group_no
+        const group = s.group_type
         const key = `${dateStr}_${time}_${group}`
         if (!uniqueKey.has(key)) {
           uniqueKey.add(key)
-          classesForDay.push({ date: dateStr, time, group_no: group })
+          classesForDay.push({ date: dateStr, time, group_type: group })
         }
       })
 
@@ -129,19 +130,19 @@ export default function ClassManagement() {
         // upsert classes
         const { data: upserted, error } = await supabase
           .from('classes')
-          .upsert(classesForDay, { onConflict: 'date,time,group_no' })
-          .select('id, date, time, group_no')
+          .upsert(classesForDay, { onConflict: 'date,time,group_type' })
+          .select('id, date, time, group_type')
         if (error) throw error
 
         // class_id 매핑
         const classIdByKey = new Map<string, number>()
         ;(upserted || []).forEach(c => {
-          classIdByKey.set(`${c.date}_${c.time}_${c.group_no}`, c.id)
+          classIdByKey.set(`${c.date}_${c.time}_${c.group_type}`, c.id)
         })
 
         // attendance 예정 upsert
         const attendanceUpserts = schedules.map(s => {
-          const key = `${dateStr}_${s.time}_${s.group_no}`
+          const key = `${dateStr}_${s.time}_${s.group_type}`
           const classId = classIdByKey.get(key)
           return { student_id: s.student_id, class_id: classId, status: '예정' as const }
         }).filter(a => a.class_id)
@@ -187,7 +188,7 @@ export default function ClassManagement() {
       if (schErr) throw schErr
 
       // 2) 해당 주차의 각 날짜에 대해 요일/시간/그룹 기준 class upsert, attendance upsert
-      const classUpserts: { date: string; time: string; group_no: number }[] = []
+      const classUpserts: { date: string; time: string; group_type: GroupType }[] = []
       const attendanceUpserts: { student_id: number; class_id: number; status: string; is_makeup: boolean; memo: string | null }[] = []
 
       // 날짜 루프
@@ -200,14 +201,14 @@ export default function ClassManagement() {
 
         // 날짜별 클래스 upsert 수행 (중복 제거)
         const uniqueKey = new Set<string>()
-        const classesForDay: { date: string; time: string; group_no: number }[] = []
+        const classesForDay: { date: string; time: string; group_type: GroupType }[] = []
         daySchedules.forEach(s => {
           const time = s.time
-          const group = s.group_no
+          const group = s.group_type
           const key = `${dateStr}_${time}_${group}`
           if (!uniqueKey.has(key)) {
             uniqueKey.add(key)
-            classesForDay.push({ date: dateStr, time, group_no: group })
+            classesForDay.push({ date: dateStr, time, group_type: group })
           }
         })
 
@@ -215,19 +216,19 @@ export default function ClassManagement() {
           // upsert classes
           const { data: upserted, error } = await supabase
             .from('classes')
-            .upsert(classesForDay, { onConflict: 'date,time,group_no' })
-            .select('id, date, time, group_no')
+            .upsert(classesForDay, { onConflict: 'date,time,group_type' })
+            .select('id, date, time, group_type')
           if (error) throw error
 
           // class_id 매핑
           const classIdByKey = new Map<string, number>()
           ;(upserted || []).forEach(c => {
-            classIdByKey.set(`${c.date}_${c.time}_${c.group_no}`, c.id)
+            classIdByKey.set(`${c.date}_${c.time}_${c.group_type}`, c.id)
           })
 
           // 해당 날짜의 각 스케줄 → attendance 예정 upsert
           for (const s of daySchedules) {
-            const key = `${dateStr}_${s.time}_${s.group_no}`
+            const key = `${dateStr}_${s.time}_${s.group_type}`
             const classId = classIdByKey.get(key)
             if (!classId) continue
             attendanceUpserts.push({ student_id: s.student_id, class_id: classId, status: '예정', is_makeup: false, memo: null })
@@ -285,7 +286,7 @@ export default function ClassManagement() {
       if (schErr) throw schErr
 
       // 2) 해당 달의 각 날짜에 대해 요일/시간/그룹 기준 class upsert, attendance upsert
-      const classUpserts: { date: string; time: string; group_no: number }[] = []
+      const classUpserts: { date: string; time: string; group_type: GroupType }[] = []
       const attendanceUpserts: { student_id: number; class_id: number; status: string; is_makeup: boolean; memo: string | null }[] = []
 
       // Helper: YYYY-MM-DD
@@ -301,14 +302,14 @@ export default function ClassManagement() {
 
         // 날짜별 클래스 upsert 수행 (중복 제거)
         const uniqueKey = new Set<string>()
-        const classesForDay: { date: string; time: string; group_no: number }[] = []
+        const classesForDay: { date: string; time: string; group_type: GroupType }[] = []
         daySchedules.forEach(s => {
           const time = s.time
-          const group = s.group_no
+          const group = s.group_type
           const key = `${dateStr}_${time}_${group}`
           if (!uniqueKey.has(key)) {
             uniqueKey.add(key)
-            classesForDay.push({ date: dateStr, time, group_no: group })
+            classesForDay.push({ date: dateStr, time, group_type: group })
           }
         })
 
@@ -316,19 +317,19 @@ export default function ClassManagement() {
           // upsert classes
           const { data: upserted, error } = await supabase
             .from('classes')
-            .upsert(classesForDay, { onConflict: 'date,time,group_no' })
-            .select('id, date, time, group_no')
+            .upsert(classesForDay, { onConflict: 'date,time,group_type' })
+            .select('id, date, time, group_type')
           if (error) throw error
 
           // class_id 매핑
           const classIdByKey = new Map<string, number>()
           ;(upserted || []).forEach(c => {
-            classIdByKey.set(`${c.date}_${c.time}_${c.group_no}`, c.id)
+            classIdByKey.set(`${c.date}_${c.time}_${c.group_type}`, c.id)
           })
 
           // 해당 날짜의 각 스케줄 → attendance 예정 upsert
           for (const s of daySchedules) {
-            const key = `${dateStr}_${s.time}_${s.group_no}`
+            const key = `${dateStr}_${s.time}_${s.group_type}`
             const classId = classIdByKey.get(key)
             if (!classId) continue
             attendanceUpserts.push({ student_id: s.student_id, class_id: classId, status: '예정', is_makeup: false, memo: null })
@@ -369,18 +370,18 @@ export default function ClassManagement() {
 
       const { data, error } = await supabase
         .from('classes')
-        .select('id, date, time, group_no, attendance:attendance(student_id, status, students:students(id, name, birth_date, current_level))')
+        .select('id, date, time, group_type, attendance:attendance(student_id, status, students:students(id, name, birth_date, current_level))')
         .gte('date', startStr)
         .lte('date', endStr)
         .order('date', { ascending: true })
         .order('time', { ascending: true })
-        .order('group_no', { ascending: true })
+        .order('group_type', { ascending: true })
       if (error) throw error
 
       const mapped = await Promise.all((data || []).map(async (c: any) => {
         let students: { id: number; name: string; grade: string; level: string; isTrial: boolean }[] = [];
         
-        if (c.group_no === 3) {
+        if (c.group_type === '체험') {
           // 체험자 데이터 로드
           try {
             const { data: trialData, error: trialError } = await supabase
@@ -418,7 +419,7 @@ export default function ClassManagement() {
           class_id: c.id,
           date: c.date,
           time: c.time,
-          group_no: c.group_no,
+          group_type: c.group_type,
           students
         }
       }))
@@ -466,7 +467,7 @@ export default function ClassManagement() {
         .select(`
           id, 
           time, 
-          group_no, 
+          group_type, 
           attendance:attendance(
             id,
             student_id,
@@ -484,14 +485,14 @@ export default function ClassManagement() {
         `)
         .eq('date', dateStr)
         .order('time', { ascending: true })
-        .order('group_no', { ascending: true })
+        .order('group_type', { ascending: true })
       
       if (error) throw error
 
       const mapped = (data || []).map((c: any) => ({
         class_id: c.id,
         time: c.time,
-        group_no: c.group_no,
+        group_type: c.group_type,
         students: ((c.attendance as any[]) || [])
           .map(a => {
             const student = a.students
@@ -688,7 +689,7 @@ export default function ClassManagement() {
     .filter(r => weekDates.some(d => toDateStr(d) === r.date))
     .map(r => r.time))).sort()
 
-  const openManageDialog = async (cls: { class_id: number; date: string; time: string; group_no: number; students: { id: number; name: string }[] }) => {
+  const openManageDialog = async (cls: { class_id: number; date: string; time: string; group_type: GroupType; students: { id: number; name: string }[] }) => {
     setManageClass(cls)
     setIsManageOpen(true)
     setStudentSearch("")
@@ -696,7 +697,7 @@ export default function ClassManagement() {
 
   
 
-  const openClassDetailDialog = (cls: { class_id: number; date: string; time: string; group_no: number; students: { id: number; name: string }[] }) => {
+  const openClassDetailDialog = (cls: { class_id: number; date: string; time: string; group_type: GroupType; students: { id: number; name: string }[] }) => {
     setSelectedClassForDetail(cls)
     setSelectedClassDate(new Date(cls.date))
     setIsClassDetailOpen(true)
@@ -1179,7 +1180,7 @@ export default function ClassManagement() {
                             const dateStr = toDateStr(weekDates[colIdx])
                             const classesForCell = realSchedule
                               .filter(r => r.date === dateStr && r.time === timeSlot)
-                              .sort((a,b) => a.group_no - b.group_no)
+                              .sort((a,b) => a.group_type - b.group_type)
                             return (
                               <TableCell key={dayKey} className="p-2">
                                 {classesForCell.length > 0 ? (
@@ -1265,7 +1266,7 @@ export default function ClassManagement() {
 
       {/* 주차별 수업 상세 모달 */}
       <Dialog open={isClassDetailOpen} onOpenChange={setIsClassDetailOpen}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-auto">
+        <DialogContent type="m">
           {selectedClassForDetail && selectedClassDate && (
             <ClassDetailCard
               classItem={selectedClassForDetail as any}
@@ -1285,7 +1286,7 @@ export default function ClassManagement() {
 
       {/* 수업 학생 관리 다이얼로그 */}
       <Dialog open={isManageOpen} onOpenChange={setIsManageOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden">
+        <DialogContent type="m">
           <div className="max-h-[90vh] flex flex-col min-h-0">
 
           <DialogHeader className="flex-shrink-0">
@@ -1304,7 +1305,7 @@ export default function ClassManagement() {
                       {format(new Date(manageClass.date), 'yyyy년 MM월 dd일 (EEEE)', { locale: ko })}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {manageClass.time} • 그룹 {manageClass.group_no}
+                      {manageClass.time} • 그룹 {manageClass.group_type}
                     </div>
                   </div>
                 </div>

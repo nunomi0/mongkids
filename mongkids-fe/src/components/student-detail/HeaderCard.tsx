@@ -11,7 +11,7 @@ export default function HeaderCard({ student, classTypes, onReload }: { student:
   const scheduleText = student.schedules
     .slice()
     .sort((a,b)=> a.weekday-b.weekday || a.time.localeCompare(b.time))
-    .map(s=> `${['월','화','수','목','금','토','일'][s.weekday]}${s.time.slice(0,5)}(그룹 ${s.group_no})`).join(', ')
+    .map(s=> `${['월','화','수','목','금','토','일'][s.weekday]}${s.time.slice(0,5)}(${s.group_type})`).join(', ')
 
   return (
     <Card className="shrink-0">

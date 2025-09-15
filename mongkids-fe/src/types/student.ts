@@ -1,9 +1,11 @@
 export type StudentStatus = '재원' | '휴원' | '퇴원' | '체험'
 
+export type GroupType = '일반1' | '일반2' | '스페셜' | '체험'
+
 export type StudentSchedule = {
   weekday: number
   time: string
-  group_no: number
+  group_type: GroupType
 }
 
 export type ClassType = {

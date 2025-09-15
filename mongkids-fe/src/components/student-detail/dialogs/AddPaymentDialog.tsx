@@ -12,7 +12,7 @@ export default function AddPaymentDialog({ open, onOpenChange, newPayment, setNe
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent type="s">
         <DialogHeader>
           <DialogTitle>결제 추가</DialogTitle>
         </DialogHeader>

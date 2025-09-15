@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card"
 import { Badge } from "../ui/badge"
 import { Button } from "../ui/button"
 import { supabase } from "../../lib/supabase"
+import { GroupType } from "../../types/student"
 import { getGradeLabel } from "../../utils/grade"
 import MemoEditor from "../MemoEditor"
 
@@ -22,7 +23,7 @@ type TrialReservation = {
     id: number
     date: string
     time: string
-    group_no: number
+    group_type: GroupType
   }
 }
 
@@ -62,7 +63,7 @@ export default function TrialDetailModal({
       // 체험 예약 정보 로드 (클래스 정보 포함)
       const { data: reservationData, error: reservationError } = await supabase
         .from('trial_reservations')
-        .select('*, classes:classes(id, date, time, group_no)')
+        .select('*, classes:classes(id, date, time, group_type)')
         .eq('id', id)
         .single()
       
@@ -109,7 +110,7 @@ export default function TrialDetailModal({
             .select('id')
             .eq('date', editForm.trial_date)
             .eq('time', editForm.trial_time)
-            .eq('group_no', 3)
+            .eq('group_type', '체험')
             .maybeSingle()
           
           if (existingClass?.id) {
@@ -121,7 +122,7 @@ export default function TrialDetailModal({
               .insert({
                 date: editForm.trial_date,
                 time: editForm.trial_time,
-                group_no: 3
+                group_type: '체험'
               })
               .select('id')
               .single()
@@ -197,7 +198,7 @@ export default function TrialDetailModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent type="m">
         <DialogHeader>
           <DialogTitle>체험자 정보</DialogTitle>
         </DialogHeader>
