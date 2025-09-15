@@ -283,21 +283,20 @@ export default function TrialDetailModal({
                         className="ml-2 px-2 py-1 border rounded text-sm"
                       >
                         <option value="">선택</option>
-                        <option value="유치원 5세">유치원 5세</option>
-                        <option value="유치원 6세">유치원 6세</option>
-                        <option value="유치원 7세">유치원 7세</option>
-                        <option value="초등학교 1학년">초등학교 1학년</option>
-                        <option value="초등학교 2학년">초등학교 2학년</option>
-                        <option value="초등학교 3학년">초등학교 3학년</option>
-                        <option value="초등학교 4학년">초등학교 4학년</option>
-                        <option value="초등학교 5학년">초등학교 5학년</option>
-                        <option value="초등학교 6학년">초등학교 6학년</option>
-                        <option value="중학교 1학년">중학교 1학년</option>
-                        <option value="중학교 2학년">중학교 2학년</option>
-                        <option value="중학교 3학년">중학교 3학년</option>
-                        <option value="고등학교 1학년">고등학교 1학년</option>
-                        <option value="고등학교 2학년">고등학교 2학년</option>
-                        <option value="고등학교 3학년">고등학교 3학년</option>
+                        <option value="6세">6세</option>
+                        <option value="7세">7세</option>
+                        <option value="초1">초1</option>
+                        <option value="초2">초2</option>
+                        <option value="초3">초3</option>
+                        <option value="초4">초4</option>
+                        <option value="초5">초5</option>
+                        <option value="초6">초6</option>
+                        <option value="중1">중1</option>
+                        <option value="중2">중2</option>
+                        <option value="중3">중3</option>
+                        <option value="고1">고1</option>
+                        <option value="고2">고2</option>
+                        <option value="고3">고3</option>
                       </select>
                     ) : (
                       <span className="ml-2">{reservation.grade || '-'}</span>

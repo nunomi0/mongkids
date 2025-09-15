@@ -13,12 +13,19 @@ import MemoEditor from "./MemoEditor"
 import { getDisplayStyle, canToggleStatus } from "../utils/attendanceStatus"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog"
 import { Plus, MoreHorizontal, Trash2 } from "lucide-react"
+import TrialDetailModal from "./trial/TrialDetailModal"
 
 interface Student {
   id: number
   name: string
   grade: string
   level: string
+}
+
+interface TrialReservation {
+  id: number
+  name: string
+  grade: string
 }
 
 interface DailyClassCardProps {
@@ -106,6 +113,32 @@ export default function DailyClassCard({
     makeup_of_attendance_id: number | null
     weekday: number
   }>>>({})
+  const [trialReservations, setTrialReservations] = useState<TrialReservation[]>([])  // 체험자 목록
+  const [isTrialDetailOpen, setIsTrialDetailOpen] = useState(false)
+  const [selectedTrialId, setSelectedTrialId] = useState<number | null>(null)
+
+  // 체험자 목록 로드 (group_no가 3인 경우)
+  useEffect(() => {
+    if (classItem.group_no === 3) {
+      loadTrialReservations()
+    }
+  }, [classItem.class_id, classItem.group_no])
+
+  const loadTrialReservations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('trial_reservations')
+        .select('id, name, grade')
+        .eq('class_id', classItem.class_id)
+        .order('name')
+      
+      if (error) throw error
+      setTrialReservations(data || [])
+    } catch (error) {
+      console.error('체험자 목록 로드 실패:', error)
+      setTrialReservations([])
+    }
+  }
 
   useEffect(() => {
     // 주차별 모달에서 넘어온 학생 데이터에 grade/level이 없을 수 있어 보강
@@ -535,11 +568,40 @@ export default function DailyClassCard({
       <CardContent>
         <div>
           <div className="flex items-center justify-between mb-2">
-            <p className="font-medium">참여 학생 ({classItem.students.length}명)</p>
+            <p className="font-medium">
+              {classItem.group_no === 3 ? `체험자 (${trialReservations.length}명)` : `참여 학생 (${classItem.students.length}명)`}
+            </p>
           </div>
           <div className="space-y-3">
-            {studentsToRender.map((student) => (
-              <React.Fragment key={student.id}>
+            {/* 체험자 목록 (group_no가 3인 경우) */}
+            {classItem.group_no === 3 ? (
+              trialReservations.map((trial) => (
+                <div 
+                  key={trial.id}
+                  className="flex items-center justify-between p-2 rounded border transition-colors bg-blue-50 border-blue-200"
+                >
+                  <div className="flex items-center gap-3">
+                    <span 
+                      role="button"
+                      tabIndex={0}
+                      className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                      onClick={() => {
+                        setSelectedTrialId(trial.id)
+                        setIsTrialDetailOpen(true)
+                      }}
+                    >
+                      {trial.name}
+                    </span>
+                    <Badge variant="outline">{trial.grade}</Badge>
+                    <Badge className="bg-orange-100 text-orange-800 border-orange-300">
+                      체험
+                    </Badge>
+                  </div>
+                </div>
+              ))
+            ) : (
+              studentsToRender.map((student) => (
+                <React.Fragment key={student.id}>
               <div 
                 className="flex items-center justify-between p-2 rounded border transition-colors"
                 onClick={() => {
@@ -712,11 +774,23 @@ export default function DailyClassCard({
               </div>
               {/* 메모 편집은 MemoEditor로 처리 */}
               </React.Fragment>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </CardContent>
     </Card>
+
+    {/* 체험자 상세 모달 */}
+    <TrialDetailModal
+      isOpen={isTrialDetailOpen}
+      onClose={() => {
+        setIsTrialDetailOpen(false)
+        setSelectedTrialId(null)
+        loadTrialReservations() // 데이터 새로고침
+      }}
+      reservationId={selectedTrialId}
+    />
 
     {/* 보강 수업 편성 모달 */}
     <Dialog open={isLinkOpen} onOpenChange={setIsLinkOpen}>

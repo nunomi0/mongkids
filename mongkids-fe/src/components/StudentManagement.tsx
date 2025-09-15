@@ -107,50 +107,45 @@ export default function StudentManagement() {
   const loadStudents = async () => {
     try {
       setLoading(true)
-      // getStudentsWithLastPayment / getClassTypes 가 없는 경우 supabase 직접 사용
-      const studentsData = await (async () => {
-        const { data, error } = await supabase
-          .from('students')
-          .select('*')
-          .neq('status', '체험')
-          .order('created_at', { ascending: false })
-        if (error) throw error
-        return (data || []).map((s: any) => ({ ...s, last_payment_date: null, last_payment_amount: null }))
-      })()
+      
+      // 학생 데이터 조회
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('students')
+        .select('*')
+        .order('created_at', { ascending: false })
+      
+      if (studentsError) throw studentsError
 
-      const classTypesData = await (async () => {
-        const { data, error } = await supabase
-          .from('class_types')
-          .select('*')
-          .order('sessions_per_week', { ascending: true })
-        if (error) throw error
-        return data || []
-      })()
+      // 클래스 타입 데이터 조회
+      const { data: classTypesData, error: classTypesError } = await supabase
+        .from('class_types')
+        .select('*')
+        .order('sessions_per_week', { ascending: true })
+      
+      if (classTypesError) throw classTypesError
       
       // 각 학생의 스케줄 정보와 최근 결제 정보 가져오기
       const studentsWithSchedules = await Promise.all(
-        studentsData.map(async (student) => {
-          const { data: schData, error: schErr } = await supabase
+        (studentsData || []).map(async (student) => {
+          // 학생 스케줄 조회
+          const { data: schedules } = await supabase
             .from('student_schedules')
             .select('*')
             .eq('student_id', student.id)
             .order('created_at', { ascending: true })
-          if (schErr) throw schErr
-          const schedules = (schData as StudentSchedule[]) || []
           
-          // 최근 결제 정보 가져오기
-          const { data: paymentData, error: paymentErr } = await supabase
+          // 최근 결제 정보 조회
+          const { data: lastPayment } = await supabase
             .from('payments')
             .select('payment_date, total_amount')
             .eq('student_id', student.id)
             .order('payment_date', { ascending: false })
             .limit(1)
-          
-          const lastPayment = paymentData && paymentData.length > 0 ? paymentData[0] : null
+            .maybeSingle()
           
           return {
             ...student,
-            schedules,
+            schedules: schedules || [],
             last_payment_date: lastPayment?.payment_date || null,
             last_payment_amount: lastPayment?.total_amount || null
           }
@@ -158,21 +153,15 @@ export default function StudentManagement() {
       )
       
       setAllStudents(studentsWithSchedules)
-      setClassTypes(classTypesData)
+      setClassTypes(classTypesData || [])
       
       // 모든 결제 내역 로드
-      const { data: paymentsData, error: paymentsError } = await supabase
+      const { data: paymentsData } = await supabase
         .from('payments')
         .select('student_id, payment_date, payment_month, total_amount')
         .order('payment_date', { ascending: false })
       
-      if (paymentsError) {
-        console.error('Error loading payments:', paymentsError)
-        setAllPayments([])
-      } else {
-        console.log('Loaded payments:', paymentsData)
-        setAllPayments(paymentsData || [])
-      }
+      setAllPayments(paymentsData || [])
       
       // 최근 12개월
       const currentDate = new Date()
@@ -189,7 +178,10 @@ export default function StudentManagement() {
       
       setAvailableMonths(monthOptions)
     } catch (error) {
-      console.error('Error loading students:', error)
+      console.error('학생 목록 로드 실패:', error)
+      setAllStudents([])
+      setClassTypes([])
+      setAllPayments([])
     } finally {
       setLoading(false)
     }
@@ -271,7 +263,9 @@ export default function StudentManagement() {
   const filteredStudents = useMemo(() => {
     let filtered = allStudents
 
-    // 상태 필터 적용
+    // 상태 필터 적용 (체험자 제외)
+    filtered = filtered.filter(student => student.status !== '체험')
+    
     if (statusFilter === '재원') {
       filtered = filtered.filter(student => student.status === '재원')
     } else if (statusFilter === '휴원') {
@@ -279,7 +273,7 @@ export default function StudentManagement() {
     } else if (statusFilter === '퇴원') {
       filtered = filtered.filter(student => student.status === '퇴원')
     }
-    // 'all'인 경우 모든 학생 포함
+    // 'all'인 경우 모든 학생 포함 (체험자 제외)
 
     // 월별 필터 적용 (모든 상태의 학생)
     if (monthFilter !== 'all') {
@@ -299,20 +293,14 @@ export default function StudentManagement() {
     // 월별 필터가 적용된 경우 결제/미결제 정렬
     if (monthFilter !== 'all') {
       filtered.sort((a, b) => {
-        // 해당 월에 결제한 학생이 있는지 확인 (payment_month 기준)
-        const aHasPayment = allPayments.some(payment => {
-          if (payment.student_id !== a.id) return false
-          if (!payment.payment_month) return false
-          // payment_month가 '2025-07' 형식이므로 직접 비교
-          return payment.payment_month === monthFilter
-        })
+        // 해당 월에 결제한 학생이 있는지 확인
+        const aHasPayment = allPayments.some(payment => 
+          payment.student_id === a.id && payment.payment_month === monthFilter
+        )
         
-        const bHasPayment = allPayments.some(payment => {
-          if (payment.student_id !== b.id) return false
-          if (!payment.payment_month) return false
-          // payment_month가 '2025-07' 형식이므로 직접 비교
-          return payment.payment_month === monthFilter
-        })
+        const bHasPayment = allPayments.some(payment => 
+          payment.student_id === b.id && payment.payment_month === monthFilter
+        )
         
         // 결제한 학생을 먼저, 미결제 학생을 나중에
         if (aHasPayment && !bHasPayment) return -1
@@ -1139,16 +1127,10 @@ export default function StudentManagement() {
                           ) : (
                             // 월별 모드: 해당 월 결제 상태 표시
                             (() => {
-                              const hasPaymentInMonth = allPayments.some(payment => {
-                                if (payment.student_id !== student.id) return false
-                                if (!payment.payment_month) return false
-                                // payment_month가 '2025-07' 형식이므로 직접 비교
-                                const isMatch = payment.payment_month === monthFilter
-                                if (isMatch) {
-                                  console.log(`Student ${student.id} has payment in ${monthFilter}:`, payment)
-                                }
-                                return isMatch
-                              })
+                              const hasPaymentInMonth = allPayments.some(payment => 
+                                payment.student_id === student.id && 
+                                payment.payment_month === monthFilter
+                              )
                               
                               return hasPaymentInMonth ? (
                                 <Badge className="bg-green-100 text-green-800 border-green-300">
@@ -1175,28 +1157,17 @@ export default function StudentManagement() {
                           ) : (
                             // 월별 모드: 해당 월 결제 상태에 따른 금액 표시
                             (() => {
-                              const hasPaymentInMonth = allPayments.some(payment => {
-                                if (payment.student_id !== student.id) return false
-                                if (!payment.payment_month) return false
-                                // payment_month가 '2025-07' 형식이므로 직접 비교
-                                return payment.payment_month === monthFilter
-                              })
+                              const monthPayment = allPayments.find(payment => 
+                                payment.student_id === student.id && payment.payment_month === monthFilter
+                              )
                               
-                              if (hasPaymentInMonth) {
+                              if (monthPayment) {
                                 // 해당 월에 결제한 경우: 해당 월의 결제금액 표시
-                                const monthPayment = allPayments.find(payment => {
-                                  if (payment.student_id !== student.id) return false
-                                  if (!payment.payment_month) return false
-                                  // payment_month가 '2025-07' 형식이므로 직접 비교
-                                  return payment.payment_month === monthFilter
-                                })
                                 
-                                return monthPayment ? (
+                                return (
                                   <div className="font-medium">
                                     {monthPayment.total_amount.toLocaleString()}원
                                   </div>
-                                ) : (
-                                  <div className="text-muted-foreground">-</div>
                                 )
                               } else {
                                 // 해당 월에 미결제인 경우: 가장 최근 결제금액을 연하게 표시

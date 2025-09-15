@@ -19,6 +19,7 @@ import StudentDetailModal from "./student-detail/StudentDetailModal"
 import ClassDetailCard from "./ClassDetailCard"
 import LevelBadge from "./LevelBadge"
 import { getGradeLabel } from "../utils/grade"
+import TrialDetailModal from "./trial/TrialDetailModal"
 
 
 
@@ -46,7 +47,7 @@ export default function ClassManagement() {
     time: string
     group_no: number
     class_id: number
-    students: { id: number; name: string; grade?: string; level?: string }[]
+    students: { id: number; name: string; grade?: string; level?: string; isTrial?: boolean }[]
   }[]>([])
   const [isManageOpen, setIsManageOpen] = useState(false)
   const [manageClass, setManageClass] = useState<{ class_id: number; date: string; time: string; group_no: number; students: { id: number; name: string }[] } | null>(null)
@@ -66,6 +67,9 @@ export default function ClassManagement() {
   // 학생 상세 정보 다이얼로그
   const [isStudentDetailOpen, setIsStudentDetailOpen] = useState(false)
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null)
+  // 체험자 상세 정보 다이얼로그
+  const [isTrialDetailOpen, setIsTrialDetailOpen] = useState(false)
+  const [selectedTrialId, setSelectedTrialId] = useState<number | null>(null)
   // 주차별 수업 상세
   const [isClassDetailOpen, setIsClassDetailOpen] = useState(false)
   const [selectedClassForDetail, setSelectedClassForDetail] = useState<{ class_id: number; date: string; time: string; group_no: number; students: { id: number; name: string }[] } | null>(null)
@@ -373,18 +377,50 @@ export default function ClassManagement() {
         .order('group_no', { ascending: true })
       if (error) throw error
 
-      const mapped = (data || []).map((c: any) => ({
-        class_id: c.id,
-        date: c.date,
-        time: c.time,
-        group_no: c.group_no,
-        students: ((c.attendance as any[]) || []).map(a => {
-          const st = a.students
-          if (!st) return null
-          // 학년 계산
-          const grade = st.birth_date ? getGradeLabel(st.birth_date) : ''
-          return { id: st.id, name: st.name, grade, level: st.current_level || 'NONE' }
-        }).filter(s => !!s && !!s.id)
+      const mapped = await Promise.all((data || []).map(async (c: any) => {
+        let students: { id: number; name: string; grade: string; level: string; isTrial: boolean }[] = [];
+        
+        if (c.group_no === 3) {
+          // 체험자 데이터 로드
+          try {
+            const { data: trialData, error: trialError } = await supabase
+              .from('trial_reservations')
+              .select('id, name, grade')
+              .eq('class_id', c.id)
+              .order('name')
+            
+            if (trialError) {
+              console.error('체험자 데이터 로드 실패:', trialError)
+            } else {
+              students = (trialData || []).map(trial => ({
+                id: trial.id,
+                name: trial.name,
+                grade: trial.grade || '',
+                level: 'TRIAL', // 체험자를 나타내는 특별한 레벨
+                isTrial: true
+              }))
+            }
+          } catch (e) {
+            console.error('체험자 데이터 로드 에러:', e)
+          }
+        } else {
+          // 일반 학생 데이터
+          students = ((c.attendance as any[]) || []).map(a => {
+            const st = a.students
+            if (!st) return null
+            // 학년 계산
+            const grade = st.birth_date ? getGradeLabel(st.birth_date) : ''
+            return { id: st.id, name: st.name, grade, level: st.current_level || 'NONE', isTrial: false }
+          }).filter(s => !!s && !!s.id)
+        }
+        
+        return {
+          class_id: c.id,
+          date: c.date,
+          time: c.time,
+          group_no: c.group_no,
+          students
+        }
       }))
       setRealSchedule(mapped)
       // DB 출석 상태를 로컬 상태에 반영 (주간 전체)
@@ -1166,17 +1202,36 @@ export default function ClassManagement() {
                                             <div className="text-xs flex flex-col gap-1">
                                               {cls.students.map(s => (
                                                 <div key={s.id} className="flex items-center gap-2">
-                                                  <span className="font-medium">{s.name}</span>
+                                                  {s.isTrial ? (
+                                                    <span 
+                                                      className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                                                      onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        setSelectedTrialId(s.id)
+                                                        setIsTrialDetailOpen(true)
+                                                      }}
+                                                    >
+                                                      {s.name}
+                                                    </span>
+                                                  ) : (
+                                                    <span className="font-medium">{s.name}</span>
+                                                  )}
                                                   <Badge variant="outline">{s.grade || ''}</Badge>
-                                                  <LevelBadge level={s.level as any} size={10} radius={2} />
-                                </div>
-                              ))}
-                            </div>
+                                                  {s.isTrial ? (
+                                                    <Badge className="bg-orange-100 text-orange-800 border-orange-300 text-[10px] px-1 py-0">
+                                                      체험
+                                                    </Badge>
+                                                  ) : (
+                                                    <LevelBadge level={s.level as any} size={10} radius={2} />
+                                                  )}
+                                                </div>
+                                              ))}
+                                            </div>
                                           ) : (
                                             <div className="text-xs text-muted-foreground">학생 없음</div>
                                           )}
-                                        </div>
-                                      </div>
+                                  </div>
+                                </div>
                               ))}
                             </div>
                                 ) : (
@@ -1419,6 +1474,16 @@ export default function ClassManagement() {
         isOpen={isStudentDetailOpen}
         onClose={() => setIsStudentDetailOpen(false)}
         studentId={selectedStudentId}
+      />
+
+      {/* 체험자 상세 정보 모달 */}
+      <TrialDetailModal
+        isOpen={isTrialDetailOpen}
+        onClose={() => {
+          setIsTrialDetailOpen(false)
+          setSelectedTrialId(null)
+        }}
+        reservationId={selectedTrialId}
       />
     </div>
   )

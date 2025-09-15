@@ -142,9 +142,8 @@ export default function TrialAddDialog({ open, onOpenChange, onAdded }: { open: 
 						<label className="text-xs text-muted-foreground">학년</label>
 						<select value={form.grade} onChange={(e)=> setForm(f=>({...f, grade: e.target.value}))} className="w-full p-2 border rounded">
 							<option value="">학년 선택</option>
-							<option value="5">5</option>
-							<option value="6">6</option>
-							<option value="7">7</option>
+							<option value="6세">6세</option>
+							<option value="7세">7세</option>
 							<option value="초1">초1</option>
 							<option value="초2">초2</option>
 							<option value="초3">초3</option>
@@ -157,7 +156,6 @@ export default function TrialAddDialog({ open, onOpenChange, onAdded }: { open: 
 							<option value="고1">고1</option>
 							<option value="고2">고2</option>
 							<option value="고3">고3</option>
-							<option value="성인">성인</option>
 						</select>
 					</div>
 					<div>
