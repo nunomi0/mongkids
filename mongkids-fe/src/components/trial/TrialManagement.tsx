@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card"
 import { Button } from "../ui/button"
 import { Badge } from "../ui/badge"
@@ -8,8 +8,9 @@ import TrialAddDialog from "./TrialAddDialog"
 import TrialDetailModal from "./TrialDetailModal"
 import { Input } from "../ui/input"
 import { Label } from "../ui/label"
-import { Plus } from "lucide-react"
+import { Search, Plus } from "lucide-react"
 import { supabase } from "../../lib/supabase"
+import { isKoreanMatch } from "../../utils/korean"
 type TrialReservation = {
   id: number
   name: string
@@ -27,6 +28,7 @@ export default function TrialManagement() {
   const [trialReservations, setTrialReservations] = useState<TrialReservation[]>([])
   const [loading, setLoading] = useState(true)
   const [isAddOpen, setIsAddOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
   
   // 체험 예약 상세 정보 다이얼로그
   const [isDetailOpen, setIsDetailOpen] = useState(false)
@@ -54,6 +56,22 @@ export default function TrialManagement() {
   }
 
 
+  // 검색 필터링된 체험 예약 목록
+  const filteredTrialReservations = useMemo(() => {
+    if (!searchTerm.trim()) return trialReservations
+    
+    return trialReservations.filter(reservation => {
+      // 이름 검색 (한국어 초성 지원)
+      const nameMatch = isKoreanMatch(reservation.name, searchTerm)
+      // 전화번호 검색
+      const phoneMatch = reservation.phone.includes(searchTerm)
+      // 학년 검색 (한국어 초성 지원)
+      const gradeMatch = reservation.grade ? isKoreanMatch(reservation.grade, searchTerm) : false
+      
+      return nameMatch || phoneMatch || gradeMatch
+    })
+  }, [trialReservations, searchTerm])
+
   // 체험 예약 상세 정보 열기
   const openReservationDetail = (reservationId: number) => {
     setSelectedReservationId(reservationId)
@@ -68,7 +86,22 @@ export default function TrialManagement() {
       </div>
 
       <div className="space-y-4">
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between gap-4">
+          {/* 검색 */}
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="이름, 전화번호, 학년으로 검색..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+          {searchTerm && (
+            <span className="text-sm text-muted-foreground">
+              {filteredTrialReservations.length}건 검색됨
+            </span>
+          )}
           <Button onClick={()=> setIsAddOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             체험 예약 등록
@@ -78,7 +111,7 @@ export default function TrialManagement() {
 
         <Card>
           <CardHeader>
-            <CardTitle>체험 예약 목록 ({trialReservations.length}건)</CardTitle>
+            <CardTitle>체험 예약 목록 ({filteredTrialReservations.length}건)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -100,8 +133,8 @@ export default function TrialManagement() {
                         로딩 중...
                       </TableCell>
                     </TableRow>
-                  ) : trialReservations.length > 0 ? (
-                    trialReservations.map((reservation) => (
+                  ) : filteredTrialReservations.length > 0 ? (
+                    filteredTrialReservations.map((reservation) => (
                       <TableRow key={reservation.id} className="cursor-pointer hover:bg-muted/50" onClick={() => openReservationDetail(reservation.id)}>
                         <TableCell className="font-medium">{reservation.name}</TableCell>
                         <TableCell>{reservation.gender || '-'}</TableCell>
@@ -127,7 +160,7 @@ export default function TrialManagement() {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center text-muted-foreground">
-                        체험 예약이 없습니다.
+                        {searchTerm ? '검색 결과가 없습니다.' : '체험 예약이 없습니다.'}
                       </TableCell>
                     </TableRow>
                   )}

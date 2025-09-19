@@ -50,7 +50,7 @@ export default function PaymentsSection({ payments, student, onReload }: { payme
                       <TableCell className="py-1 px-1 font-medium">
                         {payment.total_amount.toLocaleString()}원
                       </TableCell>
-                      <TableCell className="py-1 px-1"><Badge variant="outline" className="text-xs">{methodText}</Badge></TableCell>
+                      <TableCell className="py-1 px-1">{methodText}</TableCell>
                       <TableCell className="py-1 px-1">
                         {keywordBadges.length === 0 ? (
                           <div className="text-gray-400">-</div>

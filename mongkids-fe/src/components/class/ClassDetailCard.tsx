@@ -15,6 +15,7 @@ import { getDisplayStyle, canToggleStatus } from "../../utils/attendanceStatus"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog"
 import { Plus, MoreHorizontal, Trash2 } from "lucide-react"
 import TrialDetailModal from "../trial/TrialDetailModal"
+import { filterByKoreanSearch } from "../../utils/korean"
 
 interface Student {
   id: number
@@ -74,7 +75,7 @@ export default function DailyClassCard({
   const toHm = (t?: string) => (t && t.length >= 5 ? t.slice(0,5) : t || "")
   const [enriched, setEnriched] = useState<Student[] | null>(null)
   const [studentSearch, setStudentSearch] = useState("")
-  const [searchResults, setSearchResults] = useState<{
+  const [allStudents, setAllStudents] = useState<{
     id: number
     name: string
     gender: string
@@ -237,10 +238,10 @@ export default function DailyClassCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate.getFullYear(), selectedDate.getMonth(), studentsToRender.map(s=>s.id).join(',')])
 
+  // 모든 학생 데이터 로드
   useEffect(() => {
     let cancelled = false
     const run = async () => {
-      if (!studentSearch.trim()) { setSearchResults([]); return }
       const { data, error } = await supabase
         .from('students')
         .select(`
@@ -253,7 +254,6 @@ export default function DailyClassCard({
           class_types:class_types(category, sessions_per_week),
           student_schedules:student_schedules(weekday, time, group_type)
         `)
-        .ilike('name', `%${studentSearch}%`)
         .eq('status', '재원')
         .order('name')
       if (error) { console.error(error); return }
@@ -267,11 +267,17 @@ export default function DailyClassCard({
         class_type: s.class_types ? { category: s.class_types.category, sessions_per_week: s.class_types.sessions_per_week } : undefined,
         schedules: (s.student_schedules || []).map((sch: any) => ({ weekday: sch.weekday, time: sch.time, group_type: sch.group_type }))
       }))
-      if (!cancelled) setSearchResults(filtered)
+      if (!cancelled) setAllStudents(filtered)
     }
     run()
     return () => { cancelled = true }
-  }, [studentSearch, classItem.students])
+  }, [classItem.students])
+
+  // 한국어 검색으로 필터링된 결과
+  const searchResults = useMemo(() => {
+    if (!studentSearch.trim()) return []
+    return filterByKoreanSearch(allStudents, studentSearch, (student: any) => student.name)
+  }, [allStudents, studentSearch])
 
   const loadSourceAttendances = async (studentId: number, ym: string) => {
     const [y, m] = ym.split('-').map(n => parseInt(n, 10))
@@ -349,7 +355,6 @@ export default function DailyClassCard({
       setIsLinkOpen(false)
       setIsAddOpen(false)
       setStudentSearch("")
-      setSearchResults([])
       setMakeupNote("")
       // 즉시 반영: 상위 갱신 콜백 호출
       onClassUpdated && onClassUpdated()
@@ -365,8 +370,6 @@ export default function DailyClassCard({
         .from('attendance')
         .upsert(payload, { onConflict: 'student_id,class_id' })
       if (error) throw error
-      // 검색 결과에서 제거하여 중복 추가 방지
-      setSearchResults(prev => prev.filter(r => r.id !== studentId))
       onClassUpdated && onClassUpdated()
     } catch (e) {
       console.error('정규 추가 실패:', e)
@@ -505,7 +508,7 @@ export default function DailyClassCard({
                     <div key={s.id} className="flex items-center justify-between p-2 border rounded">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{s.name}</span>
-                        <Badge variant="outline">{s.grade}</Badge>
+                        <Badge type="grade">{s.grade}</Badge>
                       </div>
                       <Button
                         size="sm"
@@ -589,8 +592,8 @@ export default function DailyClassCard({
                     >
                       {trial.name}
                     </span>
-                    <Badge variant="outline">{trial.grade}</Badge>
-                    <Badge className="bg-orange-100 text-orange-800 border-orange-300">
+                    <Badge type="grade">{trial.grade}</Badge>
+                    <Badge type="studenttype">
                       체험
                     </Badge>
                   </div>
@@ -628,14 +631,14 @@ export default function DailyClassCard({
                   >
                     {student.name}
                   </span>
-                  <Badge variant="outline">{student.grade}</Badge>
+                  <Badge type="grade">{student.grade}</Badge>
                   <LevelBadge level={student.level as any} />
                   {(() => {
                     const disp = getDisplayStatus ? getDisplayStatus(student.id) : undefined
                     const isMakeup = disp?.startsWith('MAKEUP_') || disp?.startsWith('REGULAR_MAKEUP_')
                     if (!isMakeup) return null
                     return (
-                      <Badge variant="secondary" className={'bg-blue-50 text-blue-700 border-blue-200'}>
+                      <Badge type="color" className={'bg-blue-50 text-blue-700 border-blue-200'}>
                         보강
                       </Badge>
                     )
@@ -664,91 +667,6 @@ export default function DailyClassCard({
                       return null
                     })()}
 
-{/* 2) 깃허브 출석부: 해당 요일만 가로 스트립으로 표시, 보강 있으면 2행 */}
-<div className="flex items-start gap-4 overflow-visible">
-  {([0,1,2,3,4,5,6] as const)
-    .map((weekday) => {
-      const dayItems = (monthlyAttendance[student.id] || [])
-        .filter(r => r.weekday === weekday)
-
-      const regulars = dayItems.filter(r => r.kind === '정규')
-      const makeups  = dayItems.filter(r => r.kind === '보강')
-
-      // 해당 요일에 아무 것도 없으면 스킵
-      if (regulars.length === 0 && makeups.length === 0) return null
-
-      // 보강이 하나라도 있으면 2행 노출
-      const showMakeupRow = makeups.length > 0
-
-      const WEEK_LABEL = ['일','월','화','수','목','금','토']
-
-      const Dot: React.FC<{ rec: any; highlightLinked?: boolean }> = ({ rec, highlightLinked }) => {
-        const hasLinked =
-          rec.kind === '정규' &&
-          (monthlyAttendance[student.id] || []).some(x => x.makeup_of_attendance_id === rec.id)
-
-        const { bg, border } = getDisplayStyle(rec.kind, rec.status, hasLinked)
-        const color = highlightLinked && hasLinked && rec.kind === '정규' ? '#e0f2fe' : bg
-        const title = `${format(new Date(rec.date), 'M월 d일', { locale: ko })} ${rec.time?.slice(0,5)} 수업`
-
-        return (
-          <div className="relative">
-            <button
-              type="button"
-              className="peer block h-4 w-4 rounded-sm border"
-              style={{ backgroundColor: color, borderColor: border }}
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-              aria-label={title}
-            />
-            <span
-              className="
-                pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full
-                whitespace-nowrap rounded-md border bg-popover text-popover-foreground shadow
-                px-2 py-1 text-xs
-                opacity-0 invisible
-                peer-hover:opacity-100 peer-hover:visible
-                peer-focus:opacity-100 peer-focus:visible
-                transition-opacity duration-150
-                z-[9999]
-              "
-            >
-              {title}
-            </span>
-          </div>
-        )
-      }
-
-      return (
-        <div key={weekday} className="flex flex-col gap-1 overflow-visible">
-          {/* 요일 라벨 (한 글자) */}
-          <div className="text-[11px] leading-none text-muted-foreground">
-            {WEEK_LABEL[weekday]}
-          </div>
-
-          {/* 정규 1행 */}
-          <div className="flex items-center gap-1">
-            {regulars.map((rec) => (
-              <Dot key={`r-${rec.id}`} rec={rec} highlightLinked />
-            ))}
-          </div>
-
-          {/* 보강 2행: 정규와 같은 열 정렬 유지 (연결 없으면 투명 스페이서) */}
-          {showMakeupRow && (
-            <div className="flex items-center gap-1">
-              {regulars.map((reg) => {
-                const linked = makeups.filter(m => m.makeup_of_attendance_id === reg.id)
-                if (linked.length === 0) {
-                  return <div key={`msp-${reg.id}`} className="h-4 w-4 opacity-0" />
-                }
-                return linked.map(m => <Dot key={`m-${m.id}`} rec={m} />)
-              })}
-            </div>
-          )}
-        </div>
-      )
-    })}
-</div>
 
                     {(() => {
                       const meta = `${format(selectedDate, 'yyyy-MM-dd (E)', { locale: ko })} ${toHm(classItem.time)} - ${student.name} 메모`

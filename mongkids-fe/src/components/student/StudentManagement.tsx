@@ -12,6 +12,7 @@ import StudentDetailModal from "./StudentDetailModal"
 import AddStudentModal from "./AddStudentModal"
 import { getGradeLabel } from "../../utils/grade"
 import LevelBadge from "../LevelBadge"
+import { isKoreanMatch } from "../../utils/korean"
 // 로컬 타입 정의 (supabase.ts의 api 의존 제거)
 type LevelType = 'WHITE' | 'YELLOW' | 'GREEN' | 'BLUE' | 'RED' | 'BLACK' | 'GOLD' | null
 type Student = {
@@ -282,13 +283,18 @@ export default function StudentManagement() {
       // 필터링은 하지 않고 정렬만 수행
     }
 
-    // 검색어 필터 적용
+    // 검색어 필터 적용 (한국어 초성 검색 지원)
     if (searchTerm) {
-      filtered = filtered.filter(student =>
-        student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.phone.includes(searchTerm) ||
-        getClassTypeName(student.class_type_id).toLowerCase().includes(searchTerm.toLowerCase())
-      )
+      filtered = filtered.filter(student => {
+        // 이름 검색 (한국어 초성 지원)
+        const nameMatch = isKoreanMatch(student.name, searchTerm)
+        // 전화번호 검색
+        const phoneMatch = student.phone.includes(searchTerm)
+        // 수강정보 검색 (한국어 초성 지원)
+        const classMatch = isKoreanMatch(getClassTypeName(student.class_type_id), searchTerm)
+        
+        return nameMatch || phoneMatch || classMatch
+      })
     }
 
     // 월별 필터가 적용된 경우 결제/미결제 정렬
@@ -398,18 +404,6 @@ export default function StudentManagement() {
     }
   }
 
-  const getStatusColor = (status: StudentStatus) => {
-    switch (status) {
-      case "재원":
-        return "bg-green-100 text-green-800 border border-green-300"
-      case "휴원":
-        return "bg-yellow-100 text-yellow-800 border border-yellow-300"
-      case "퇴원":
-        return "bg-red-100 text-red-800 border border-red-300"
-      default:
-        return "bg-gray-100 text-gray-600 border border-gray-300"
-    }
-  }
 
   // 수강 종류에 따른 기본 스케줄 생성
   const createDefaultSchedules = (studentId: number, classTypeId: number | null) => {
@@ -1104,7 +1098,11 @@ export default function StudentManagement() {
                       >
                         <TableCell>{student.name}</TableCell>
                         <TableCell>{student.gender}</TableCell>
-                        <TableCell>{getGradeLabel(student.birth_date)}</TableCell>
+                        <TableCell>
+                          <Badge type="grade">
+                            {getGradeLabel(student.birth_date)}
+                          </Badge>
+                          </TableCell>
                         <TableCell>
                           {student.current_level ? <LevelBadge level={student.current_level as any} /> : "-"}
                         </TableCell>
@@ -1134,11 +1132,11 @@ export default function StudentManagement() {
                               )
                               
                               return hasPaymentInMonth ? (
-                                <Badge className="bg-green-100 text-green-800 border-green-300">
+                                <Badge type="color" className="bg-green-100 text-green-800 border-green-300">
                                   결제완료
                           </Badge>
                               ) : (
-                                <Badge className="bg-red-100 text-red-800 border-red-300">
+                                <Badge type="color" className="bg-red-100 text-red-800 border-red-300">
                                   미결제
                                 </Badge>
                               )
@@ -1184,7 +1182,7 @@ export default function StudentManagement() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge className={getStatusColor(student.status)}>
+                          <Badge type="studentstatus">
                             {student.status}
                           </Badge>
                         </TableCell>

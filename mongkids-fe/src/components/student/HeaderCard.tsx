@@ -7,7 +7,6 @@ import { getGradeLabel } from "../../utils/grade"
 
 export default function HeaderCard({ student, classTypes, onReload }: { student: Student; classTypes: ClassType[]; onReload: () => void }) {
   const classType = student.class_type_id ? classTypes.find(c => c.id === student.class_type_id) : undefined
-  const statusColor = student.status === '재원' ? 'bg-green-100 text-green-800 border-green-300' : student.status === '휴원' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' : 'bg-red-100 text-red-800 border-red-300'
   const scheduleText = student.schedules
     .slice()
     .sort((a,b)=> a.weekday-b.weekday || a.time.localeCompare(b.time))
@@ -31,7 +30,7 @@ export default function HeaderCard({ student, classTypes, onReload }: { student:
                 <LevelBadge level={student.current_level as any} size={18} radius={3} />
               </div>
             )}
-            <Badge className={`text-sm px-3 py-1 ${statusColor}`}>{student.status}</Badge>
+            <Badge type="studentstatus" className="text-sm px-3 py-1">{student.status}</Badge>
           </div>
         </div>
     </Card>

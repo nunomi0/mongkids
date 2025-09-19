@@ -1156,9 +1156,9 @@ export default function ClassManagement() {
                                                   ) : (
                                                     <span className="font-medium">{s.name}</span>
                                                   )}
-                                                  <Badge variant="outline">{s.grade || ''}</Badge>
+                                                  <Badge type="grade">{s.grade || ''}</Badge>
                                                   {s.isTrial ? (
-                                                    <Badge className="bg-orange-100 text-orange-800 border-orange-300 text-[10px] px-1 py-0">
+                                                    <Badge type="studenttype" className="text-[10px] px-1 py-0">
                                                       체험
                                                     </Badge>
                                                   ) : (
