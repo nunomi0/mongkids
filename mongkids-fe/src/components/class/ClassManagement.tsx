@@ -20,6 +20,7 @@ import StudentDetailModal from "../student/StudentDetailModal"
 import ClassDetailCard from "./ClassDetailCard"
 import LevelBadge from "../LevelBadge"
 import { getGradeLabel } from "../../utils/grade"
+import { getLevelColor, LevelValue } from "../../utils/level"
 import TrialDetailModal from "../trial/TrialDetailModal"
 
 
@@ -37,10 +38,6 @@ export default function ClassManagement() {
 
   // 학생별 출석 상태 (yyyy-MM-dd => 상태)
   const [attendanceStatus, setAttendanceStatus] = useState<Record<number, Record<string, 'present' | 'absent' | 'makeup' | 'makeup_done'>>>({})
-  // 깃허브 잔디형 월간 4칸 출결 상태 (present/absent/makeup/none)
-  const [attendanceGrid, setAttendanceGrid] = useState<Record<number, Record<string, ("present"|"absent"|"makeup"|"none")[]>>>({})
-  // 캘린더 하이라이트(호버)용 상태
-  const [hoveredCalendarDates, setHoveredCalendarDates] = useState<{present: Date[]; absent: Date[]; makeup: Date[]; makeup_done: Date[]}>({ present: [], absent: [], makeup: [], makeup_done: [] })
   const [isGenerating, setIsGenerating] = useState(false)
   const [hasAttendanceData, setHasAttendanceData] = useState<{daily: boolean, weekly: boolean}>({daily: false, weekly: false})
   const [realSchedule, setRealSchedule] = useState<{
@@ -412,7 +409,7 @@ export default function ClassManagement() {
             // 학년 계산
             const grade = st.birth_date ? getGradeLabel(st.birth_date) : ''
             return { id: st.id, name: st.name, grade, level: st.current_level || 'NONE', isTrial: false }
-          }).filter(s => !!s && !!s.id)
+          }).filter((s): s is { id: number; name: string; grade: string; level: string; isTrial: boolean } => !!s && !!s.id)
         }
         
         return {
@@ -774,7 +771,7 @@ export default function ClassManagement() {
 
   // 레벨 우선순위 (높은 숫자가 높은 우선순위)
   const getLevelPriority = (level: string) => {
-    switch (level) {
+    switch (level as LevelValue) {
       case "NONE": return 1
       case "WHITE": return 2
       case "YELLOW": return 3
@@ -852,22 +849,6 @@ export default function ClassManagement() {
       return { ...prev, [studentId]: mapForStudent }
     })
     
-    // 깃헙 잔디 그리드도 업데이트
-    setAttendanceGrid(prev => {
-      const studentGrid = { ...(prev[studentId] || {}) }
-      const monthKey = getMonthKey(selectedDate)
-      const weekIndex = getWeekIndexInMonth(selectedDate)
-      
-      if (!studentGrid[monthKey]) {
-        studentGrid[monthKey] = ['none', 'none', 'none', 'none']
-      }
-      
-      const newGrid = [...studentGrid[monthKey]]
-      newGrid[weekIndex] = nextStatus === 'none' ? 'none' : nextStatus
-      studentGrid[monthKey] = newGrid
-      
-      return { ...prev, [studentId]: studentGrid }
-    })
 
     // DB 반영 (optional classId가 전달된 경우만)
     if (classId) {
@@ -975,45 +956,12 @@ export default function ClassManagement() {
 
 
   // 월간 4칸 상태 가져오기/설정
-  const getWeeklyCells = (studentId: number, date: Date) => {
-    const monthKey = getMonthKey(date)
-    const existing = attendanceGrid[studentId]?.[monthKey]
-    if (existing) return existing
-    return ["none","none","none","none"] as ("present"|"absent"|"makeup"|"none")[]
-  }
-
-  const setWeeklyCell = (studentId: number, date: Date, index: number, value: "present"|"absent"|"makeup"|"makeup_done"|"none") => {
-    const monthKey = getMonthKey(date)
-    setAttendanceGrid(prev => {
-      const studentMap = { ...(prev[studentId] || {}) }
-      const cells = [...(studentMap[monthKey] || ["none","none","none","none"] as const)] as ("present"|"absent"|"makeup"|"makeup_done"|"none")[]
-      cells[index] = value
-      return { ...prev, [studentId]: { ...studentMap, [monthKey]: cells } }
-    })
-  }
-
-  // 셀 클릭 시 상태 순환
-  const cycleWeeklyCell = (studentId: number, date: Date, index: number) => {
-    const cells = getWeeklyCells(studentId, date)
-    const current = cells[index]
-    // 순환: none -> present -> absent -> makeup -> makeup_done -> none
-    const next =
-      current === 'none' ? 'present'
-      : current === 'present' ? 'absent'
-      : current === 'absent' ? 'makeup'
-      : current === 'makeup' ? 'makeup_done'
-      : 'none'
-    setWeeklyCell(studentId, date, index, next)
-  }
 
   return (
     <div className="space-y-6">
       <div>
         <h1>수업 관리</h1>
         <p className="text-muted-foreground">진행 중인 수업과 전체 시간표를 관리합니다.</p>
-        <p className="text-sm text-muted-foreground">
-          현재 시간: {currentTime.toLocaleString('ko-KR')}
-        </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -1038,10 +986,10 @@ export default function ClassManagement() {
                     mode="single"
                     selected={selectedDate}
                     modifiers={{
-                      present: (date) => hoveredCalendarDates.present.some(d => isSameDay(d, date)),
-                      absent: (date) => hoveredCalendarDates.absent.some(d => isSameDay(d, date)),
-                      makeup: (date) => hoveredCalendarDates.makeup.some(d => isSameDay(d, date)),
-                      makeup_done: (date) => hoveredCalendarDates.makeup_done.some(d => isSameDay(d, date)),
+                      present: () => false,
+                      absent: () => false,
+                      makeup: () => false,
+                      makeup_done: () => false,
                     }}
                     onSelect={(date) => {
                       if (date) {
@@ -1076,11 +1024,9 @@ export default function ClassManagement() {
                         classItem={classItem}
                         selectedDate={selectedDate}
                         getStatusOnDate={getStatusOnDate}
-                        getWeeklyCells={getWeeklyCells}
                         getAttendanceDatesForCellByStatus={getAttendanceDatesForCellByStatus}
                         toggleAttendanceForSelectedDate={toggleAttendanceForSelectedDate}
                         openStudentDetail={openStudentDetail}
-                        setHoveredCalendarDates={setHoveredCalendarDates}
                         toDateObjectsFromMonthDay={toDateObjectsFromMonthDay}
                         getDisplayStatus={(studentId) => getDisplayStatus(studentId, selectedDate, classItem.class_id) as any}
                         getDisplayStatusForCell={(studentId, idx) => {
@@ -1272,11 +1218,9 @@ export default function ClassManagement() {
               classItem={selectedClassForDetail as any}
               selectedDate={selectedClassDate}
               getStatusOnDate={getStatusOnDate as any}
-              getWeeklyCells={getWeeklyCells as any}
               getAttendanceDatesForCellByStatus={getAttendanceDatesForCellByStatus as any}
               toggleAttendanceForSelectedDate={toggleAttendanceForSelectedDate as any}
               openStudentDetail={openStudentDetail as any}
-              setHoveredCalendarDates={setHoveredCalendarDates as any}
               toDateObjectsFromMonthDay={toDateObjectsFromMonthDay as any}
               onClassUpdated={() => loadRealSchedule(scheduleWeek.start, scheduleWeek.end)}
             />
@@ -1329,21 +1273,7 @@ export default function ClassManagement() {
                               </div>
                               <span className="font-medium">{s.name}</span>
                               {s.level && (
-                                <Badge 
-                                  variant="secondary" 
-                                  className={`text-xs px-2 py-0 ${
-                                    s.level === 'WHITE' ? 'bg-white text-gray-800 border border-gray-300' :
-                                    s.level === 'YELLOW' ? 'bg-yellow-100 text-yellow-800' :
-                                    s.level === 'GREEN' ? 'bg-green-100 text-green-800' :
-                                    s.level === 'BLUE' ? 'bg-blue-100 text-blue-800' :
-                                    s.level === 'RED' ? 'bg-red-100 text-red-800' :
-                                    s.level === 'BLACK' ? 'bg-gray-800 text-white' :
-                                    s.level === 'GOLD' ? 'bg-yellow-500 text-white' :
-                                    'bg-gray-100 text-gray-800'
-                                  }`}
-                                >
-                                  {s.level}
-                                </Badge>
+                                <LevelBadge level={s.level as LevelValue} size={12} radius={2} />
                               )}
                             </div>
                             <Button 
@@ -1414,21 +1344,7 @@ export default function ClassManagement() {
                                     </td>
                                     <td className="p-3">
                                       {s.current_level && (
-                                        <Badge 
-                                          variant="secondary" 
-                                          className={`text-xs px-2 py-0 ${
-                                            s.current_level === 'WHITE' ? 'bg-white text-gray-800 border border-gray-300' :
-                                            s.current_level === 'YELLOW' ? 'bg-yellow-100 text-yellow-800' :
-                                            s.current_level === 'GREEN' ? 'bg-green-100 text-green-800' :
-                                            s.current_level === 'BLUE' ? 'bg-blue-100 text-blue-800' :
-                                            s.current_level === 'RED' ? 'bg-red-100 text-red-800' :
-                                            s.current_level === 'BLACK' ? 'bg-gray-800 text-white' :
-                                            s.current_level === 'GOLD' ? 'bg-yellow-500 text-white' :
-                                            'bg-gray-100 text-gray-800'
-                                          }`}
-                                        >
-                                          {s.current_level}
-                                        </Badge>
+                                        <LevelBadge level={s.current_level as LevelValue} size={12} radius={2} />
                                       )}
                                     </td>
                                     <td className="p-3 text-right">

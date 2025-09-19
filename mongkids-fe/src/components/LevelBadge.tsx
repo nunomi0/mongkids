@@ -1,5 +1,5 @@
 import React from "react"
-import { getLevelColor, LevelValue } from "../utils/levelColor"
+import { getLevelColor, LevelValue } from "../utils/level"
 
 interface LevelBadgeProps {
   level: LevelValue | '' | null | undefined

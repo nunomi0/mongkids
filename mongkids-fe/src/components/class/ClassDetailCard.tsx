@@ -9,7 +9,7 @@ import { supabase } from "../../lib/supabase"
 import { GroupType } from "../../types/student"
 import LevelBadge from "../LevelBadge"
 import { getGradeLabel } from "../../utils/grade"
-import { getLevelColor } from "../../utils/levelColor"
+import { getLevelColor } from "../../utils/level"
 import MemoEditor from "../MemoEditor"
 import { getDisplayStyle, canToggleStatus } from "../../utils/attendanceStatus"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog"
@@ -38,7 +38,6 @@ interface DailyClassCardProps {
   }
   selectedDate: Date
   getStatusOnDate: (studentId: number, date: Date) => string
-  getWeeklyCells: (studentId: number, date: Date) => ("present"|"absent"|"makeup"|"none")[]
   getAttendanceDatesForCellByStatus: (studentId: number, baseDate: Date, index: number) => {
     present: string[]
     absent: string[]
@@ -48,7 +47,6 @@ interface DailyClassCardProps {
   // getMonthlyAttendanceCount 제거 (사용 안 함)
   toggleAttendanceForSelectedDate: (studentId: number, classId?: number) => void
   openStudentDetail: (studentId: number) => void
-  setHoveredCalendarDates: (dates: {present: Date[]; absent: Date[]; makeup: Date[]; makeup_done: Date[]}) => void
   toDateObjectsFromMonthDay: (baseDate: Date, monthDayList: string[]) => Date[]
   onClassUpdated?: () => void
   borderless?: boolean
@@ -62,11 +60,9 @@ export default function DailyClassCard({
   classItem,
   selectedDate,
   getStatusOnDate,
-  getWeeklyCells,
   getAttendanceDatesForCellByStatus,
   toggleAttendanceForSelectedDate,
   openStudentDetail,
-  setHoveredCalendarDates,
   toDateObjectsFromMonthDay,
   onClassUpdated,
   borderless,
@@ -417,7 +413,7 @@ export default function DailyClassCard({
             )}
 
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-              <DialogContent type="s">
+              <DialogContent type="m">
                 <DialogHeader>
                   <DialogTitle>학생 추가</DialogTitle>
                 </DialogHeader>
