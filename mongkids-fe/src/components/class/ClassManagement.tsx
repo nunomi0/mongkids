@@ -1057,12 +1057,12 @@ export default function ClassManagement() {
           </div>
         </TabsContent>
 
-        <TabsContent value="schedule">
-          <Card>
+        <TabsContent value="schedule" className="w-full">
+          <Card className="w-full">
             <CardHeader>
               <CardTitle>주차별 수업 시간표</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="w-full">
               <div className="mb-6">
                 <div className="flex items-center gap-2 mb-2 text-sm font-medium">
                   <CalendarIcon className="h-4 w-4" /> 주차 선택
@@ -1087,13 +1087,6 @@ export default function ClassManagement() {
                           return date >= scheduleWeek.start && date <= scheduleWeek.end
                         }
                       }}
-                      modifiersStyles={{
-                        selected: {
-                          backgroundColor: '#000000',
-                          color: '#ffffff',
-                          fontWeight: 'bold'
-                        }
-                      }}
                     />
                   </div>
                   <div className="p-3 bg-primary/5 border rounded-md h-fit">
@@ -1106,8 +1099,8 @@ export default function ClassManagement() {
                 </div>
               </div>
               {realTimeSlots.length > 0 ? (
-              <div className="overflow-x-auto">
-                <Table>
+              <div className="overflow-x-auto w-full">
+                <Table className="w-full">
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-24">시간</TableHead>
@@ -1121,7 +1114,7 @@ export default function ClassManagement() {
                   <TableBody>
                       {realTimeSlots.map((timeSlot) => (
                         <TableRow key={timeSlot}>
-                          <TableCell>{timeSlot}</TableCell>
+                          <TableCell>{timeSlot.slice(0, 5)}</TableCell>
                           {["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].map((dayKey, colIdx) => {
                             const dateStr = toDateStr(weekDates[colIdx])
                             const classesForCell = realSchedule
@@ -1134,7 +1127,7 @@ export default function ClassManagement() {
                                     {classesForCell.map((cls) => (
                                       <div key={cls.class_id} className="p-2 rounded-lg border bg-card cursor-pointer hover:bg-accent/50 hover:shadow-md transition-all duration-200" onClick={() => openClassDetailDialog(cls)}>
                             <div className="space-y-1">
-                                          <div className="font-medium text-sm flex items-center justify-between">
+                                          <div className="font-medium text-sm">
                                             <div className="flex items-center gap-2">
                                               <span className="hover:text-primary transition-colors">
                                                 {format(new Date(cls.date), 'MM/dd (E)', { locale: ko })}
@@ -1142,9 +1135,9 @@ export default function ClassManagement() {
                                               <span className="hover:text-primary transition-colors">
                                                 {cls.time?.slice(0,5)}
                                               </span>
-                                    </div>
-                                            <Badge variant="outline" className="text-xs">{cls.students.length}명</Badge>
-                                  </div>
+                                            </div>
+                                            <Badge variant="outline" className="text-xs mt-1">{cls.students.length}명</Badge>
+                                          </div>
                                           {cls.students.length > 0 ? (
                                             <div className="text-xs flex flex-col gap-1">
                                               {cls.students.map(s => (
