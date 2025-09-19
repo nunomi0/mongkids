@@ -102,100 +102,103 @@ export default function TrialAddDialog({ isOpen, onClose, onAdded }: Props) {
 
 	return (
 		<Dialog open={isOpen} onOpenChange={onClose}>
-			<DialogContent type="s">
+			<DialogContent type="m">
 				<DialogHeader>
 					<DialogTitle>체험자 등록</DialogTitle>
 				</DialogHeader>
-				<div className="space-y-4">
-					<div>
-						<label className="text-sm font-medium">이름 *</label>
-						<Input
-							value={form.name}
-							onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
-							placeholder="이름을 입력하세요"
-						/>
-					</div>
-
-					<div>
-						<label className="text-sm font-medium">전화번호 *</label>
-						<Input
-							value={form.phone}
-							onChange={(e) => setForm(prev => ({ ...prev, phone: e.target.value }))}
-							placeholder="전화번호를 입력하세요"
-						/>
-					</div>
-
-					<div>
-						<label className="text-sm font-medium">성별</label>
-						<div className="flex gap-2 mt-1">
-							<Button
-								type="button"
-								variant={form.gender === "남" ? "default" : "outline"}
-								size="sm"
-								onClick={() => setForm(prev => ({ ...prev, gender: "남" }))}
-							>
-								남
-							</Button>
-							<Button
-								type="button"
-								variant={form.gender === "여" ? "default" : "outline"}
-								size="sm"
-								onClick={() => setForm(prev => ({ ...prev, gender: "여" }))}
-							>
-								여
-							</Button>
-						</div>
-					</div>
-
-					<div>
-						<label className="text-sm font-medium">학년</label>
-						<select
-							value={form.grade}
-							onChange={(e) => setForm(prev => ({ ...prev, grade: e.target.value }))}
-							className="w-full p-2 border rounded-md mt-1"
-						>
-							{gradeOptions.map(grade => (
-								<option key={grade} value={grade}>{grade}</option>
-							))}
-						</select>
-					</div>
-
-					<div>
-						<label className="text-sm font-medium">체험 날짜 *</label>
-						<div className="mt-1">
-							<Calendar
-								mode="single"
-								selected={selectedDate}
-								onSelect={setSelectedDate}
-								className="rounded-md border"
+				<div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 pt-2">
+				{/* 왼쪽 열: 기본 정보 */}
+					<div className="space-y-4">
+						<div>
+							<label className="text-xs text-muted-foreground">이름 <span className="text-red-500">*</span></label>
+							<Input
+								value={form.name}
+								onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
+								placeholder="체험자 이름"
 							/>
 						</div>
+						<div>
+							<label className="text-xs text-muted-foreground">전화번호 <span className="text-red-500">*</span></label>
+							<Input
+								value={form.phone}
+								onChange={(e) => setForm(prev => ({ ...prev, phone: e.target.value }))}
+								placeholder="010-1234-5678"
+							/>
+						</div>
+						<div>
+							<label className="text-xs text-muted-foreground">성별</label>
+							<div className="flex gap-2 mt-1">
+								<Button
+									type="button"
+									variant={form.gender === "남" ? "default" : "outline"}
+									size="sm"
+									onClick={() => setForm(prev => ({ ...prev, gender: "남" }))}
+								>
+									남
+								</Button>
+								<Button
+									type="button"
+									variant={form.gender === "여" ? "default" : "outline"}
+									size="sm"
+									onClick={() => setForm(prev => ({ ...prev, gender: "여" }))}
+								>
+									여
+								</Button>
+							</div>
+						</div>
+						<div>
+							<label className="text-xs text-muted-foreground">학년</label>
+							<select
+								value={form.grade}
+								onChange={(e) => setForm(prev => ({ ...prev, grade: e.target.value }))}
+								className="w-full p-2 border rounded"
+							>
+								{gradeOptions.map(grade => (
+									<option key={grade} value={grade}>{grade}</option>
+								))}
+							</select>
+						</div>
 					</div>
 
-					<div>
-						<label className="text-sm font-medium">수업 시간 *</label>
-						<select
-							value={selectedTime}
-							onChange={(e) => setSelectedTime(e.target.value)}
-							className="w-full p-2 border rounded-md mt-1"
-						>
-							{timeOptions.map(time => (
-								<option key={time} value={time}>{time}</option>
-							))}
-						</select>
+					{/* 오른쪽 열: 체험 일정 */}
+					<div className="space-y-4">
+						<div>
+							<label className="text-xs text-muted-foreground">체험 날짜 <span className="text-red-500">*</span></label>
+							<div className="mt-1">
+								<Calendar
+									mode="single"
+									selected={selectedDate}
+									onSelect={setSelectedDate}
+									className="rounded-md border"
+								/>
+							</div>
+						</div>
+						<div>
+							<label className="text-xs text-muted-foreground">수업 시간 <span className="text-red-500">*</span></label>
+							<select
+								value={selectedTime}
+								onChange={(e) => setSelectedTime(e.target.value)}
+								className="w-full p-2 border rounded mt-1"
+							>
+								{timeOptions.map(time => (
+									<option key={time} value={time}>{time}</option>
+								))}
+							</select>
+						</div>
 					</div>
+				</div>
 
-					<div className="flex justify-end gap-2 pt-4">
-						<Button variant="outline" onClick={onClose}>
-							취소
-						</Button>
-						<Button 
-							onClick={handleSubmit}
-							disabled={!form.name || !form.phone || !selectedDate}
-						>
-							등록
-						</Button>
-					</div>
+				{/* 액션 */}
+				<div className="flex items-center justify-end gap-2 p-4 pt-0">
+					<Button variant="outline" onClick={onClose}>
+						취소
+					</Button>
+					<Button 
+						onClick={handleSubmit}
+						disabled={!form.name || !form.phone || !selectedDate}
+					>
+						등록
+					</Button>
 				</div>
 			</DialogContent>
 		</Dialog>

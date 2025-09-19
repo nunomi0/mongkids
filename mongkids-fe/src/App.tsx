@@ -2,8 +2,8 @@ import React, { useState } from "react"
 import { Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from "./components/ui/sidebar"
 import { Home, BookOpen, Users, UserPlus } from "lucide-react"
 import MainDashboard from "./components/MainDashboard"
-import ClassManagement from "./components/ClassManagement"
-import StudentManagement from "./components/StudentManagement"
+import ClassManagement from "./components/class/ClassManagement"
+import StudentManagement from "./components/student/StudentManagement"
 import TrialManagement from "./components/trial/TrialManagement"
 
 const menuItems = [

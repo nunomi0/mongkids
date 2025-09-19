@@ -73,7 +73,7 @@ export default function TrialManagement() {
             <Plus className="w-4 h-4 mr-2" />
             체험 예약 등록
           </Button>
-          <TrialAddDialog open={isAddOpen} onOpenChange={setIsAddOpen} onAdded={loadTrialReservations} />
+          <TrialAddDialog isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} onAdded={loadTrialReservations} />
         </div>
 
         <Card>
