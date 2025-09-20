@@ -37,6 +37,7 @@ export type AttendanceItem = {
   status: '예정'|'출석'|'결석'
   kind?: '정규'|'보강'
   note?: string | null
+  makeup_of_attendance_id?: number | null
   classes?: { date?: string, time?: string }
 }
 

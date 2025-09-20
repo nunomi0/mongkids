@@ -1,6 +1,7 @@
-import React from "react"
+import React, { useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table"
+import { Badge } from "../ui/badge"
 import MemoEditor from "../MemoEditor"
 import { AttendanceItem, Student } from "../../types/student"
 import { format } from "date-fns"
@@ -9,6 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { supabase } from "../../lib/supabase"
 
 export default function AttendanceSection({ attendance, attnYearMonth, setAttnYearMonth, student, onReload }: { attendance: AttendanceItem[]; attnYearMonth: string; setAttnYearMonth: (v: string)=>void; student: Student; onReload: () => void }) {
+  
+  // 보강 수업의 원본 정규 수업 찾기
+  const getOriginalClass = (makeupAttendanceId: number | null | undefined) => {
+    if (!makeupAttendanceId) return null
+    return attendance.find(a => a.id === makeupAttendanceId)
+  }
+
   return (
     <Card className="shrink-0">
       <CardHeader className="pb-2">
@@ -48,20 +56,53 @@ export default function AttendanceSection({ attendance, attnYearMonth, setAttnYe
                   <TableRow key={a.id} className="border-t">
                     <TableCell className="p-2 whitespace-nowrap">{a.classes?.date ? format(new Date(a.classes.date), 'MM/dd (E)', { locale: ko }) : '-'}</TableCell>
                     <TableCell className="p-2 whitespace-nowrap">{a.classes?.time ? (a.classes.time as string).slice(0,5) : '-'}</TableCell>
-                    <TableCell className="p-2 whitespace-nowrap">{a.kind || ((a as any).makeup_of_attendance_id ? '보강' : '정규')}</TableCell>
-                    <TableCell className="p-2 whitespace-nowrap">
-                      <select
-                        className="border rounded px-2 py-1 cursor-pointer hover:bg-accent/30"
-                        value={a.status}
-                        onChange={async (e)=>{
-                          try {
-                            await supabase.from('attendance').update({ status: e.target.value }).eq('id', a.id)
-                            onReload()
-                          } catch (err) { console.error(err) }
-                        }}
-                      >
-                        {['예정','출석','결석'].map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
+                    <TableCell className="p-2">
+                      <div className="flex flex-col gap-1">
+                        <Badge 
+                          variant="outline"
+                          className={
+                            a.kind === '보강' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                            'bg-blue-50 text-blue-700 border-blue-200'
+                          }
+                        >
+                          {a.kind || (a.makeup_of_attendance_id ? '보강' : '정규')}
+                        </Badge>
+                        {a.kind === '보강' && a.makeup_of_attendance_id && (() => {
+                          const original = getOriginalClass(a.makeup_of_attendance_id)
+                          return original && original.classes?.date ? (
+                            <div className="text-xs text-muted-foreground">
+                              {format(new Date(original.classes.date), 'MM/dd', { locale: ko })} 수업
+                            </div>
+                          ) : null
+                        })()}
+                      </div>
+                    </TableCell>
+                    <TableCell className="p-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1">
+                          {['예정', '출석', '결석'].map(status => (
+                            <button
+                              key={status}
+                              className={`text-xs px-2 py-1 rounded border transition-colors ${
+                                a.status === status 
+                                  ? 'bg-primary text-primary-foreground border-primary'
+                                  : 'bg-background hover:bg-accent border-input'
+                              }`}
+                              onClick={async () => {
+                                if (a.status === status) return // 이미 선택된 상태면 무시
+                                try {
+                                  await supabase.from('attendance').update({ status }).eq('id', a.id)
+                                  onReload()
+                                } catch (err) { 
+                                  console.error('출석 상태 변경 실패:', err)
+                                }
+                              }}
+                            >
+                              {status}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </TableCell>
                     <TableCell className="p-2">
                       <div className="flex items-center gap-2">

@@ -44,7 +44,7 @@ export function useStudentDetailData(studentId: number | null, isOpen: boolean) 
 
       const { data: attData } = await supabase
         .from('attendance')
-        .select('id, status, kind, note, classes:classes(date, time)')
+        .select('id, status, kind, note, makeup_of_attendance_id, classes:classes(date, time)')
         .eq('student_id', id)
         .order('created_at', { ascending: false })
       setAttendance((attData as AttendanceItem[]) || [])
