@@ -1,10 +1,21 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = 'https://aytsbdefcjmqnpdvjfmc.supabase.co'
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5dHNiZGVmY2ptcW5wZHZqZm1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1OTY4NzEsImV4cCI6MjA3MjE3Mjg3MX0.Zs5WIf_q2FJRTNIXQsuu9HS8vcdHzI13g7XQe3_D_mk'
+const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || ''
+const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || ''
 
-// RLS를 우회하기 위한 서비스 키 (실제 프로덕션에서는 환경변수로 관리해야 함)
-// 여기서는 일단 anon 키를 사용하고, RLS 정책에서 익명 접근을 허용해야 함
+if (!supabaseUrl || !supabaseAnonKey) {
+  // 개발 중 환경변수 미설정 시 빠르게 원인 파악을 위해 명확한 에러를 던짐
+  const msg = [
+    '[Supabase init] 환경변수가 설정되지 않았습니다.',
+    '필수값:',
+    ' - VITE_SUPABASE_URL=https://<your-project-ref>.supabase.co',
+    ' - VITE_SUPABASE_ANON_KEY=<your-anon-key>',
+    'mongkids-fe/.env 파일을 만들고 위 값을 채워주세요. (서버 재시작 필요)'
+  ].join('\n')
+  console.error(msg)
+  throw new Error('Supabase env not configured')
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // 또는 서비스 키가 있다면:

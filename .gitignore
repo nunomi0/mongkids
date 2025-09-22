@@ -1,0 +1,16 @@
+# Node
+node_modules/
+
+# Builds
+/dist
+/build
+
+# Env files (do not commit secrets)
+.env
+.env.*
+!.env.example
+
+# Frontend env files
+mongkids-fe/.env
+mongkids-fe/.env.*
+!mongkids-fe/.env.example
