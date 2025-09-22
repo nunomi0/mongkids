@@ -61,6 +61,9 @@ export default function ClassManagement() {
   // attendance 상세 맵과 정규→보강 링크 맵
   const [attendanceMap, setAttendanceMap] = useState<Record<string, { id: number; student_id: number; class_id: number; date: string; status: '예정'|'출석'|'결석'; kind: '정규'|'보강'; makeup_of_attendance_id: number | null }>>({})
   const [makeupByRegularId, setMakeupByRegularId] = useState<Record<number, { id: number; status: '예정'|'출석'|'결석' }>>({})
+  // 컨텍스트 메뉴 상태 (주차별 수업 추가/삭제)
+  const [addMenu, setAddMenu] = useState<null | { x: number; y: number; date: string; time: string }>(null)
+  const [deleteMenu, setDeleteMenu] = useState<null | { x: number; y: number; classId: number; hasStudents: boolean }>(null)
   
   // 학생 상세 정보 다이얼로그
   const [isStudentDetailOpen, setIsStudentDetailOpen] = useState(false)
@@ -420,6 +423,9 @@ export default function ClassManagement() {
           students
         }
       }))
+      // 콘솔 출력: 주간 수업 원본/매핑 데이터
+      console.log('[ClassManagement] weekly raw', data)
+      console.log('[ClassManagement] weekly mapped', mapped)
       setRealSchedule(mapped)
       // DB 출석 상태를 로컬 상태에 반영 (주간 전체)
       const nextStatusState: Record<number, Record<string, 'present' | 'absent' | 'makeup' | 'makeup_done'>> = {}
@@ -507,7 +513,9 @@ export default function ClassManagement() {
           })
           .filter(Boolean)
       }))
-
+      // 콘솔 출력: 일별 수업 원본/매핑 데이터
+      console.log('[ClassManagement] daily raw', data)
+      console.log('[ClassManagement] daily mapped', mapped)
       setDailyClasses(mapped)
       // attendance 맵 구성 및 정규→보강 링크 수집
       const nextMap: Record<string, { id: number; student_id: number; class_id: number; date: string; status: '예정'|'출석'|'결석'; kind: '정규'|'보강'; makeup_of_attendance_id: number | null; note?: string | null }> = {}
@@ -698,6 +706,58 @@ export default function ClassManagement() {
     setSelectedClassForDetail(cls)
     setSelectedClassDate(new Date(cls.date))
     setIsClassDetailOpen(true)
+  }
+
+  // 컨텍스트 메뉴: 외부 클릭 시 닫기
+  useEffect(() => {
+    const onGlobalClick = () => {
+      if (addMenu) setAddMenu(null)
+      if (deleteMenu) setDeleteMenu(null)
+    }
+    window.addEventListener('click', onGlobalClick)
+    return () => {
+      window.removeEventListener('click', onGlobalClick)
+    }
+  }, [addMenu, deleteMenu])
+
+  // 수업 생성
+  const createClass = async (dateStr: string, time: string, group: GroupType) => {
+    try {
+      const { error } = await supabase
+        .from('classes')
+        .upsert({ date: dateStr, time, group_type: group }, { onConflict: 'date,time,group_type' })
+      if (error) throw error
+      await loadRealSchedule(scheduleWeek.start, scheduleWeek.end)
+    } catch (e) {
+      console.error('수업 생성 실패:', e)
+      alert('수업 생성에 실패했습니다.')
+    } finally {
+      setAddMenu(null)
+    }
+  }
+
+  // 수업 삭제 (학생이 없을 때만)
+  const deleteClass = async (classId: number) => {
+    try {
+      // 안전 확인: attendance 카운트 조회
+      const { count, error: cntErr } = await supabase
+        .from('attendance')
+        .select('*', { count: 'exact', head: true })
+        .eq('class_id', classId)
+      if (cntErr) throw cntErr
+      if ((count || 0) > 0) {
+        alert('학생이 있는 수업은 삭제할 수 없습니다.')
+        return
+      }
+      const { error } = await supabase.from('classes').delete().eq('id', classId)
+      if (error) throw error
+      await loadRealSchedule(scheduleWeek.start, scheduleWeek.end)
+    } catch (e) {
+      console.error('수업 삭제 실패:', e)
+      alert('수업 삭제에 실패했습니다.')
+    } finally {
+      setDeleteMenu(null)
+    }
   }
 
   const addStudentToClass = async (studentId: number) => {
@@ -1121,11 +1181,31 @@ export default function ClassManagement() {
                               .filter(r => r.date === dateStr && r.time === timeSlot)
                               .sort((a,b) => a.group_type - b.group_type)
                             return (
-                              <TableCell key={dayKey} className="p-2">
+                              <TableCell
+                                key={dayKey}
+                                className="p-2"
+                                onContextMenu={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  // 카드 자체 우클릭은 카드 핸들러에서 처리되고 여기까지 전파되지 않음
+                                  setDeleteMenu(null)
+                                  setAddMenu({ x: e.clientX, y: e.clientY, date: dateStr, time: timeSlot })
+                                }}
+                              >
                                 {classesForCell.length > 0 ? (
                                   <div className="space-y-2">
                                     {classesForCell.map((cls) => (
-                                      <div key={cls.class_id} className="p-2 rounded-lg border bg-card cursor-pointer hover:bg-accent/50 hover:shadow-md transition-all duration-200" onClick={() => openClassDetailDialog(cls)}>
+                                      <div
+                                        key={cls.class_id}
+                                        className="p-2 rounded-lg border bg-card cursor-pointer hover:bg-accent/50 hover:shadow-md transition-all duration-200"
+                                        onClick={() => openClassDetailDialog(cls)}
+                                        onContextMenu={(e) => {
+                                          e.preventDefault()
+                                          e.stopPropagation()
+                                          setAddMenu(null)
+                                          setDeleteMenu({ x: e.clientX, y: e.clientY, classId: cls.class_id, hasStudents: cls.students.length > 0 })
+                                        }}
+                                      >
                             <div className="space-y-1">
                                           <div className="font-medium text-sm">
                                             <div className="flex items-center gap-2">
@@ -1175,7 +1255,11 @@ export default function ClassManagement() {
                               ))}
                             </div>
                                 ) : (
-                                  <div className="text-muted-foreground text-sm">-</div>
+                                  <div
+                                    className="text-muted-foreground text-sm select-none"
+                                  >
+                                    -
+                                  </div>
                                 )}
                           </TableCell>
                             )
@@ -1202,6 +1286,57 @@ export default function ClassManagement() {
         </TabsContent>
 
       </Tabs>
+
+      {/* 우클릭: 빈 셀 수업 추가 메뉴 */}
+      {addMenu && (() => {
+        const existing = new Set(realSchedule
+          .filter(r => r.date === addMenu.date && r.time === addMenu.time)
+          .map(r => r.group_type))
+        const options = (['일반1','일반2','스페셜','체험'] as GroupType[]).filter(g => !existing.has(g))
+        return (
+          <div
+            style={{ position: 'fixed', top: addMenu.y, left: addMenu.x, zIndex: 10000 }}
+            className="bg-popover text-popover-foreground border rounded-md shadow-md p-2 w-44"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-2 py-1.5 text-xs text-muted-foreground">수업 추가 ({addMenu.time.slice(0,5)})</div>
+            <div className="h-px bg-border my-1" />
+            {options.length > 0 ? (
+              options.map((g) => (
+                <button
+                  key={g}
+                  className="w-full text-left px-2 py-1 text-sm hover:bg-accent rounded"
+                  onClick={() => createClass(addMenu.date, addMenu.time, g)}
+                >
+                  {g} 추가
+                </button>
+              ))
+            ) : (
+              <div className="px-2 py-1 text-xs text-muted-foreground">추가 가능한 그룹이 없습니다</div>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* 우클릭: 수업 삭제 메뉴 */}
+      {deleteMenu && (
+        <div
+          style={{ position: 'fixed', top: deleteMenu.y, left: deleteMenu.x, zIndex: 10000 }}
+          className="bg-popover text-popover-foreground border rounded-md shadow-md p-2 w-36"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className={`w-full text-left px-2 py-1 text-sm rounded ${deleteMenu.hasStudents ? 'text-muted-foreground cursor-not-allowed' : 'hover:bg-accent text-destructive'}`}
+            onClick={() => {
+              if (deleteMenu.hasStudents) return
+              deleteClass(deleteMenu.classId)
+            }}
+            disabled={deleteMenu.hasStudents}
+          >
+            수업 삭제
+          </button>
+        </div>
+      )}
 
       {/* 주차별 수업 상세 모달 */}
       <Dialog open={isClassDetailOpen} onOpenChange={setIsClassDetailOpen}>
