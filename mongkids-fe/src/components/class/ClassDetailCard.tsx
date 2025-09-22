@@ -132,6 +132,51 @@ export default function DailyClassCard({
     loadTrialReservations()
   }, [classItem.class_id, classItem.group_type])
 
+  // 모든 학생 데이터 로드
+  useEffect(() => {
+    let cancelled = false
+    const run = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('students')
+          .select(`
+            id,
+            name,
+            gender,
+            birth_date,
+            current_level,
+            status,
+            class_types:class_types(category, sessions_per_week),
+            student_schedules:student_schedules(weekday, time, group_type)
+          `)
+          .eq('status', '재원')
+          .order('name')
+        
+        if (error) {
+          console.error('학생 데이터 로드 오류:', error)
+          return
+        }
+        
+        const existingIds = new Set(classItem.students.map(s => s.id))
+        const filtered = (data || []).filter((s: any) => !existingIds.has(s.id)).map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          gender: s.gender,
+          birth_date: s.birth_date,
+          current_level: s.current_level,
+          class_type: s.class_types ? { category: s.class_types.category, sessions_per_week: s.class_types.sessions_per_week } : undefined,
+          schedules: (s.student_schedules || []).map((sch: any) => ({ weekday: sch.weekday, time: sch.time, group_type: sch.group_type }))
+        }))
+        
+        if (!cancelled) setAllStudents(filtered)
+      } catch (error) {
+        console.error('학생 데이터 로드 실패:', error)
+      }
+    }
+    run()
+    return () => { cancelled = true }
+  }, [classItem.students])
+
   return (
     <>
       <Card className={borderless ? 'border-none shadow-none' : undefined}>

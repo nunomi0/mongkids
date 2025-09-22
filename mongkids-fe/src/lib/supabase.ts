@@ -1,9 +1,20 @@
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = 'https://aytsbdefcjmqnpdvjfmc.supabase.co'
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5dHNiZGVmY2ptcW5wZHZqZm1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1OTY4NzEsImV4cCI6MjA3MjE3Mjg3MX0.Zs5WIf_q2FJRTNIXQsuu9HS8vcdHzI13g7XQe3_D_mk'
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5dHNiZGVmY2ptcW5wZHZqZm1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1OTY4NzEsImV4cCI6MjA3MjE3Mjg3MX0.Zs5WIf_q2FJRTNIXQsuu9HS8vcdHzI13g7XQe3_D_mk'
 
-export const supabase = createClient(supabaseUrl, supabaseKey)
+// RLS를 우회하기 위한 서비스 키 (실제 프로덕션에서는 환경변수로 관리해야 함)
+// 여기서는 일단 anon 키를 사용하고, RLS 정책에서 익명 접근을 허용해야 함
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+// 또는 서비스 키가 있다면:
+// const supabaseServiceKey = 'your-service-key-here'
+// export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+//   auth: {
+//     autoRefreshToken: false,
+//     persistSession: false
+//   }
+// })
 
 // 타입 정의
 export interface Student {

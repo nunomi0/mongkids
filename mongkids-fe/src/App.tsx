@@ -1,10 +1,13 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from "./components/ui/sidebar"
-import { Home, BookOpen, Users, UserPlus } from "lucide-react"
+import { Home, BookOpen, Users, UserPlus, LogOut } from "lucide-react"
 import MainDashboard from "./components/MainDashboard"
 import ClassManagement from "./components/class/ClassManagement"
 import StudentManagement from "./components/student/StudentManagement"
 import TrialManagement from "./components/trial/TrialManagement"
+import LoginScreen from "./components/LoginScreen"
+import { supabase } from "./lib/supabase"
+import { Button } from "./components/ui/button"
 
 const menuItems = [
   {
@@ -31,6 +34,72 @@ const menuItems = [
 
 export default function App() {
   const [activeMenu, setActiveMenu] = useState("main")
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    // 로컬 스토리지에서 인증 상태 확인
+    const checkAuth = async () => {
+      try {
+        const authStatus = localStorage.getItem('mongkids_auth')
+        const authTime = localStorage.getItem('mongkids_auth_time')
+        
+        if (authStatus === 'true' && authTime) {
+          // 24시간 후 자동 로그아웃
+          const loginTime = parseInt(authTime)
+          const now = Date.now()
+          const twentyFourHours = 24 * 60 * 60 * 1000
+          
+          if (now - loginTime < twentyFourHours) {
+            // 유효한 세션, Supabase 익명 로그인
+            await initSupabaseAuth()
+            setIsAuthenticated(true)
+          } else {
+            // 세션 만료
+            localStorage.removeItem('mongkids_auth')
+            localStorage.removeItem('mongkids_auth_time')
+            setIsAuthenticated(false)
+          }
+        } else {
+          setIsAuthenticated(false)
+        }
+      } catch (error) {
+        console.error('Auth check error:', error)
+        setIsAuthenticated(false)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    checkAuth()
+  }, [])
+
+  const initSupabaseAuth = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        // 익명 로그인으로 RLS 정책 우회
+        await supabase.auth.signInAnonymously()
+      }
+    } catch (error) {
+      console.error('Supabase auth error:', error)
+    }
+  }
+
+  const handleLogin = async (success: boolean) => {
+    if (success) {
+      await initSupabaseAuth()
+      setIsAuthenticated(true)
+    }
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('mongkids_auth')
+    localStorage.removeItem('mongkids_auth_time')
+    supabase.auth.signOut()
+    setIsAuthenticated(false)
+  }
 
   const renderContent = () => {
     switch (activeMenu) {
@@ -45,6 +114,20 @@ export default function App() {
       default:
         return <MainDashboard />
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-lg">로딩 중...</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return <LoginScreen onLogin={handleLogin} />
   }
 
   return (
@@ -70,6 +153,19 @@ export default function App() {
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
+            
+            {/* 로그아웃 버튼 */}
+            <div className="mt-auto p-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                className="w-full"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                로그아웃
+              </Button>
+            </div>
           </SidebarContent>
         </Sidebar>
         

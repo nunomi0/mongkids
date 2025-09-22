@@ -5,11 +5,15 @@ import { getGradeLabel } from "../utils/grade"
 
 type DashboardStudent = {
   id: number
-  status?: string
-  is_active?: boolean
-  birth_date?: string | null
-  current_level?: string | null
-  created_at?: string | null
+  name: string
+  gender: '남' | '여'
+  birth_date: string
+  phone: string
+  registration_date: string
+  class_type_id: number | null
+  current_level: string | null
+  status: '재원' | '퇴원' | '휴원' | '체험'
+  created_at: string
 }
 type DashboardPayment = { payment_date: string; total_amount: number }
 
@@ -27,7 +31,7 @@ export default function MainDashboard() {
     try {
       setLoading(true)
       const [{ data: studentsData, error: sErr }, { data: paymentsData, error: pErr }] = await Promise.all([
-        supabase.from('students').select('id, status, is_active, birth_date, current_level, created_at'),
+        supabase.from('students').select('id, name, gender, birth_date, phone, registration_date, class_type_id, current_level, status, created_at'),
         supabase.from('payments').select('payment_date, total_amount')
       ])
       if (sErr) throw sErr
@@ -51,20 +55,19 @@ export default function MainDashboard() {
   }, [todoText])
 
   const totalStudents = students.length
-  const activeStudents = students.filter(s => (s.status ? s.status === '재원' : !!s.is_active)).length
+  const activeStudents = students.filter(s => s.status === '재원').length
   const newRegisteredThisMonth = useMemo(() => {
     const now = new Date()
     return students.filter(s => {
-      if (!s.created_at) return false
-      const d = new Date(s.created_at)
+      const d = new Date(s.registration_date)
       return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
     }).length
   }, [students])
 
-  // 학년 분포
+  // 학년 분포 (재원생만)
   const gradeDistribution = useMemo(() => {
     const map = new Map<string, number>()
-    students.forEach(s => {
+    students.filter(s => s.status === '재원').forEach(s => {
       const label = getGradeLabel(s.birth_date || null)
       if (!label) return
       map.set(label, (map.get(label) || 0) + 1)
@@ -76,10 +79,10 @@ export default function MainDashboard() {
     return entries
   }, [students])
 
-  // 레벨 분포
+  // 레벨 분포 (재원생만)
   const levelDistribution = useMemo(() => {
     const map = new Map<string, number>()
-    students.forEach(s => {
+    students.filter(s => s.status === '재원').forEach(s => {
       const level = s.current_level || 'NONE'
       map.set(level, (map.get(level) || 0) + 1)
     })
