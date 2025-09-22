@@ -38,28 +38,33 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // 로컬 스토리지에서 인증 상태 확인
+    // Supabase 세션 + 24시간 만료(로컬 스토리지) 함께 확인
     const checkAuth = async () => {
       try {
+        const { data: { session } } = await supabase.auth.getSession()
         const authStatus = localStorage.getItem('mongkids_auth')
         const authTime = localStorage.getItem('mongkids_auth_time')
         
-        if (authStatus === 'true' && authTime) {
-          // 24시간 후 자동 로그아웃
-          const loginTime = parseInt(authTime)
-          const now = Date.now()
-          const twentyFourHours = 24 * 60 * 60 * 1000
-          
-          if (now - loginTime < twentyFourHours) {
-            // 유효한 세션, Supabase 익명 로그인
-            await initSupabaseAuth()
-            setIsAuthenticated(true)
-          } else {
-            // 세션 만료
-            localStorage.removeItem('mongkids_auth')
-            localStorage.removeItem('mongkids_auth_time')
-            setIsAuthenticated(false)
-          }
+        const twentyFourHours = 24 * 60 * 60 * 1000
+        const now = Date.now()
+
+        // Supabase 세션이 있고, 로컬 기준 시간이 없다면 지금 시간으로 초기화
+        if (session && !authTime) {
+          localStorage.setItem('mongkids_auth', 'true')
+          localStorage.setItem('mongkids_auth_time', now.toString())
+        }
+
+        const storedTime = localStorage.getItem('mongkids_auth_time')
+        const within24h = storedTime ? (now - parseInt(storedTime)) < twentyFourHours : false
+
+        if (session && within24h) {
+          setIsAuthenticated(true)
+        } else if (session && !within24h) {
+          // 24시간 초과 시 강제 로그아웃
+          await supabase.auth.signOut()
+          localStorage.removeItem('mongkids_auth')
+          localStorage.removeItem('mongkids_auth_time')
+          setIsAuthenticated(false)
         } else {
           setIsAuthenticated(false)
         }
@@ -89,6 +94,9 @@ export default function App() {
 
   const handleLogin = async (success: boolean) => {
     if (success) {
+      // 로그인 성공 시점 기록 (24시간 세션 기준)
+      localStorage.setItem('mongkids_auth', 'true')
+      localStorage.setItem('mongkids_auth_time', Date.now().toString())
       await initSupabaseAuth()
       setIsAuthenticated(true)
     }
