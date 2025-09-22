@@ -17,6 +17,27 @@ type DashboardStudent = {
 }
 type DashboardPayment = { payment_date: string; total_amount: number }
 
+// 막대 그래프용 미니 컴포넌트
+function BarChartMini({ data }: { data: Array<{ label: string; value: number }> }) {
+  const max = Math.max(1, ...data.map(d => d.value))
+  return (
+    <div className="space-y-2">
+      {data.map((d) => (
+        <div key={d.label} className="flex items-center gap-3">
+          <div className="w-14 shrink-0 text-xs text-muted-foreground text-right">{d.label}</div>
+          <div className="flex-1 h-3 bg-muted rounded">
+            <div
+              className="h-3 rounded bg-blue-500"
+              style={{ width: `${(d.value / max) * 100}%` }}
+            />
+          </div>
+          <div className="w-8 shrink-0 text-xs text-right font-medium">{d.value}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function MainDashboard() {
   const [students, setStudents] = useState<DashboardStudent[]>([])
   const [payments, setPayments] = useState<DashboardPayment[]>([])
@@ -72,7 +93,6 @@ export default function MainDashboard() {
       if (!label) return
       map.set(label, (map.get(label) || 0) + 1)
     })
-    // 보기 좋게 정렬: 유사 학년 순서
     const order = ['6세','초1','초2','초3','초4','초5','초6','중1','중2','중3','고1','고2','고3','성인']
     const entries = Array.from(map.entries())
     entries.sort((a,b) => (order.indexOf(a[0]) - order.indexOf(b[0])))
@@ -91,6 +111,16 @@ export default function MainDashboard() {
     entries.sort((a,b) => (order.indexOf(a[0]) - order.indexOf(b[0])))
     return entries
   }, [students])
+
+  const gradeChartData = useMemo(
+    () => gradeDistribution.map(([label, value]) => ({ label, value })), 
+    [gradeDistribution]
+  )
+  const levelChartData = useMemo(
+    () => levelDistribution.map(([label, value]) => ({ label, value })), 
+    [levelDistribution]
+  )
+
   const thisMonthPayments = payments
     .filter(p => {
       const paymentDate = new Date(p.payment_date)
@@ -104,66 +134,55 @@ export default function MainDashboard() {
     <div className="space-y-6">
       <div>
         <h1>메인 대시보드</h1>
-        <p className="text-muted-foreground">학원 관리 시스템에 오신 것을 환영합니다.</p>
+        <p className="text-muted-foreground">학생 현황, 분포를 확인할 수 있습니다.</p>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>재원생 + 신규 등록</CardTitle>
+            <CardTitle>재원생 현황</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline gap-4">
-              <p className="text-3xl font-bold">{loading ? '로딩 중...' : activeStudents}명</p>
               <p className="text-muted-foreground">재원</p>
+              <p className="text-3xl font-bold">{loading ? '로딩 중...' : activeStudents}명</p>
             </div>
-            <div className="mt-2 text-sm">
-              신규 등록: <span className="font-semibold">{loading ? '로딩 중...' : newRegisteredThisMonth}명</span>
+            <div className="flex items-baseline gap-4">
+              <p className="text-muted-foreground">신규등록</p>
+              <p className="text-3xl font-bold">{loading ? '로딩 중...' : newRegisteredThisMonth}명</p>
             </div>
           </CardContent>
         </Card>
 
+        {/* 학년별 분포 */}
         <Card>
           <CardHeader>
             <CardTitle>학년별 재원생 분포</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-2 text-sm">
-              {loading ? (
-                <span>로딩 중...</span>
-              ) : gradeDistribution.length === 0 ? (
-                <span className="text-muted-foreground">데이터 없음</span>
-              ) : (
-                gradeDistribution.map(([grade, count]) => (
-                  <div key={grade} className="flex items-center justify-between px-2 py-1 rounded border">
-                    <span>{grade}</span>
-                    <span className="font-semibold">{count}</span>
-                  </div>
-                ))
-              )}
-            </div>
+            {loading ? (
+              <span>로딩 중...</span>
+            ) : gradeChartData.length === 0 ? (
+              <span className="text-muted-foreground">데이터 없음</span>
+            ) : (
+              <BarChartMini data={gradeChartData} />
+            )}
           </CardContent>
         </Card>
 
+        {/* 레벨별 분포 */}
         <Card>
           <CardHeader>
             <CardTitle>레벨 분포</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-4 gap-2 text-sm">
-              {loading ? (
-                <span>로딩 중...</span>
-              ) : levelDistribution.length === 0 ? (
-                <span className="text-muted-foreground">데이터 없음</span>
-              ) : (
-                levelDistribution.map(([level, count]) => (
-                  <div key={level} className="flex items-center justify-between px-2 py-1 rounded border">
-                    <span>{level}</span>
-                    <span className="font-semibold">{count}</span>
-                  </div>
-                ))
-              )}
-            </div>
+            {loading ? (
+              <span>로딩 중...</span>
+            ) : levelChartData.length === 0 ? (
+              <span className="text-muted-foreground">데이터 없음</span>
+            ) : (
+              <BarChartMini data={levelChartData} />
+            )}
           </CardContent>
         </Card>
 
