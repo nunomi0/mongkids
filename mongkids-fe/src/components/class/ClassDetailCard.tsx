@@ -172,6 +172,40 @@ export default function DailyClassCard({
 
   const studentsToRender = enriched || classItem.students
 
+  // 보강 원본 출석 → 수업 날짜/시간 매핑
+  const [linkedSourceMap, setLinkedSourceMap] = useState<Record<number, { date: string; time: string }>>({})
+
+  useEffect(() => {
+    const makeupIds: number[] = []
+    studentsToRender.forEach((s) => {
+      const rec = getAttendanceRecord ? (getAttendanceRecord(s.id) as any) : undefined
+      if (rec?.kind === '보강' && rec?.makeup_of_attendance_id && !linkedSourceMap[rec.makeup_of_attendance_id]) {
+        makeupIds.push(rec.makeup_of_attendance_id)
+      }
+    })
+    if (makeupIds.length === 0) return
+    let cancelled = false
+    const run = async () => {
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('id, classes:classes(date, time)')
+        .in('id', Array.from(new Set(makeupIds)))
+      if (error) { console.error('보강 원본 로드 실패:', error); return }
+      const next: Record<number, { date: string; time: string }> = {}
+      ;(data || []).forEach((a: any) => {
+        if (a?.id && a?.classes?.date && a?.classes?.time) {
+          next[a.id] = { date: a.classes.date as string, time: a.classes.time as string }
+        }
+      })
+      if (!cancelled && Object.keys(next).length > 0) {
+        setLinkedSourceMap((prev) => ({ ...prev, ...next }))
+      }
+    }
+    run()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentsToRender.map(s=>s.id).join(','), classItem.class_id, selectedDate.toDateString()])
+
   // 월별 출석 데이터 로드 (이 카드의 학생들 대상, selectedDate의 월 기준)
   useEffect(() => {
     const run = async () => {
@@ -658,9 +692,10 @@ export default function DailyClassCard({
                         )
                       }
                       if (rec?.kind === '보강') {
+                        const src = rec?.makeup_of_attendance_id ? linkedSourceMap[rec.makeup_of_attendance_id] : undefined
                         return (
                           <span className="text-xs text-blue-700">
-                            {`${format(selectedDate, 'MM/dd', { locale: ko })} ${toHm(classItem.time)} 수업 보강`}
+                            {src ? `${format(new Date(src.date), 'MM/dd', { locale: ko })} ${toHm(src.time)} 수업 보강` : `${format(selectedDate, 'MM/dd', { locale: ko })} ${toHm(classItem.time)} 수업 보강`}
                           </span>
                         )
                       }
