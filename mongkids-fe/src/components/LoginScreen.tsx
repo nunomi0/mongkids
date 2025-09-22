@@ -47,16 +47,18 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center">
+        <Card
+            style={{ width: '20vw'}}
+        >
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold text-gray-900">
             몽키즈클라이밍 고양화정점
           </CardTitle>
-          <p className="text-gray-600 mt-2">관리자 로그인</p>
+          <p className="text-gray-600 mt-2">로그인</p>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4 h-full flex flex-col justify-center">
             <div className="space-y-2">
               <Label htmlFor="password">비밀번호</Label>
               <Input
@@ -71,12 +73,12 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
             </div>
 
             {error && (
-              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className="text-sm">
                 {error}
               </div>
             )}
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full mt-4" disabled={isLoading}>
               {isLoading ? "로그인 중..." : "로그인"}
             </Button>
           </form>
