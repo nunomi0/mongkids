@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog"
 import { Card } from "../ui/card"
 import { Button } from "../ui/button"
 import HeaderCard from "./HeaderCard"
+import MemoEditor from "../MemoEditor"
 import LevelHistoryCard from "./LevelHistoryCard"
 import AttendanceSection from "./AttendanceSection"
 import PaymentsSection from "./PaymentsSection"
@@ -33,7 +34,9 @@ export default function StudentDetailModal({ isOpen, onClose, studentId }: { isO
           <div className="p-6 text-center text-muted-foreground"></div>
         ) : student ? (
           <div className="flex flex-col gap-4">
-            <HeaderCard student={student} classTypes={classTypes} onReload={reload} />
+            <div className="space-y-2">
+              <HeaderCard student={student} classTypes={classTypes} onReload={reload} />
+            </div>
             <LevelHistoryCard levelHistories={levelHistories} student={student} onReload={reload} />
             <AttendanceSection attendance={attendance} attnYearMonth={attnYearMonth} setAttnYearMonth={setAttnYearMonth} student={student} onReload={reload} />
             <PaymentsSection payments={payments} student={student} onReload={reload} />

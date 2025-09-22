@@ -321,6 +321,13 @@ export default function DailyClassCard({
                         )
                       })()}
 
+                      {/* 학생 메모 아이콘 (students.memo) */}
+                      <MemoEditor
+                        studentOnlyId={student.id}
+                        label={`${student.name} 학생 메모`}
+                        className="ml-1"
+                      />
+
                     </div>
                   </div>
                 </React.Fragment>

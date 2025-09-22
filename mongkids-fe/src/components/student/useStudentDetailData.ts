@@ -16,7 +16,7 @@ export function useStudentDetailData(studentId: number | null, isOpen: boolean) 
       setLoading(true)
       const { data: studentData, error: sErr } = await supabase
         .from('students')
-        .select(`*, student_schedules ( weekday, time, group_type ), student_levels ( level, created_at )`)
+        .select(`*, memo, memo_isopen, student_schedules ( weekday, time, group_type ), student_levels ( level, created_at )`)
         .eq('id', id)
         .single()
       if (sErr) throw sErr
@@ -33,7 +33,9 @@ export function useStudentDetailData(studentId: number | null, isOpen: boolean) 
         current_level: studentData.current_level,
         status: studentData.status,
         schedules,
-      })
+        ...(studentData.memo !== undefined ? { memo: studentData.memo } : {}),
+        ...(studentData.memo_isopen !== undefined ? { memo_isopen: studentData.memo_isopen } : {}),
+      } as any)
       setLevelHistories((studentData?.student_levels || []).map((l: any) => ({ level: l.level, acquired_date: l.created_at })))
 
       const { data: classTypeData } = await supabase.from('class_types').select('*')
@@ -44,7 +46,7 @@ export function useStudentDetailData(studentId: number | null, isOpen: boolean) 
 
       const { data: attData } = await supabase
         .from('attendance')
-        .select('id, status, kind, note, makeup_of_attendance_id, classes:classes(date, time)')
+        .select('id, status, kind, note, note_isopen, makeup_of_attendance_id, classes:classes(date, time)')
         .eq('student_id', id)
         .order('created_at', { ascending: false })
       setAttendance((attData as AttendanceItem[]) || [])

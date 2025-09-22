@@ -4,6 +4,8 @@ import { Badge } from "../ui/badge"
 import LevelBadge from "../LevelBadge"
 import { Student, ClassType } from "../../types/student"
 import { getGradeLabel } from "../../utils/grade"
+import MemoEditor from "../MemoEditor"
+
 
 export default function HeaderCard({ student, classTypes, onReload }: { student: Student; classTypes: ClassType[]; onReload: () => void }) {
   const classType = student.class_type_id ? classTypes.find(c => c.id === student.class_type_id) : undefined
@@ -11,6 +13,8 @@ export default function HeaderCard({ student, classTypes, onReload }: { student:
     .slice()
     .sort((a,b)=> a.weekday-b.weekday || a.time.localeCompare(b.time))
     .map(s=> `${['월','화','수','목','금','토','일'][s.weekday]}${s.time.slice(0,5)}(${s.group_type})`).join(', ')
+
+  const studentMemo = (student as any).memo as string | null | undefined
 
   return (
     <Card className="shrink-0">
@@ -22,6 +26,12 @@ export default function HeaderCard({ student, classTypes, onReload }: { student:
             <div className="text-xs text-gray-500 mt-1"><span className="font-medium">신발 사이즈:</span> {student.shoe_size || '-'}</div>
             <div className="text-xs text-gray-500 mt-1"><span className="font-medium">전화번호:</span> {student.phone}</div>
             <div className="text-xs text-gray-500 mt-1"><span className="font-medium">등록일:</span> {student.registration_date}</div>
+            <div className="flex items-center justify-between mt-1">
+              <div className="text-xs text-gray-600">
+                메모: {studentMemo ? studentMemo : '-'}
+              </div>
+              <MemoEditor studentOnlyId={student.id} label={`${student.name} 학생 메모`} hideBubble />
+            </div>
           </div>
           <div className="flex items-center gap-3">
             {student.current_level && (
