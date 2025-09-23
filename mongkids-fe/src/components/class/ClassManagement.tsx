@@ -393,6 +393,7 @@ export default function ClassManagement() {
             if (trialError) {
               console.error('체험자 데이터 로드 실패:', trialError)
             } else {
+              console.log('[ClassManagement] trial weekly list', { classId: c.id, count: (trialData || []).length, trialData })
               students = (trialData || []).map(trial => ({
                 id: trial.id,
                 name: trial.name,
@@ -1179,7 +1180,7 @@ export default function ClassManagement() {
                             const dateStr = toDateStr(weekDates[colIdx])
                             const classesForCell = realSchedule
                               .filter(r => r.date === dateStr && r.time === timeSlot)
-                              .sort((a,b) => a.group_type - b.group_type)
+                              .sort((a,b) => (a.group_type as string).toString().localeCompare((b.group_type as string).toString()))
                             return (
                               <TableCell
                                 key={dayKey}

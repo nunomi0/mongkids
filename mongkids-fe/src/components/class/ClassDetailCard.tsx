@@ -114,6 +114,8 @@ export default function DailyClassCard({
   const [trialReservations, setTrialReservations] = useState<TrialReservation[]>([])  // 체험자 목록
   const [isTrialDetailOpen, setIsTrialDetailOpen] = useState(false)
   const [selectedTrialId, setSelectedTrialId] = useState<number | null>(null)
+  // 보강 ↔ 정규 연결된 원본 수업의 날짜/시간 캐시
+  const [originalClassByAttendanceId, setOriginalClassByAttendanceId] = useState<Record<number, { date: string; time: string }>>({})
 
   // 체험자 목록 로드 (group_type이 '체험'인 경우)
   useEffect(() => {
@@ -171,6 +173,41 @@ export default function DailyClassCard({
   }, [classItem.class_id, classItem.students])
 
   const studentsToRender = enriched || classItem.students
+
+  // 보강 수업의 원본(정규) 수업 날짜/시간 로드
+  useEffect(() => {
+    const run = async () => {
+      try {
+        // 화면에 표시되는 학생들 중 보강 레코드의 연결된 정규 attendance id 수집
+        const targetIds: number[] = []
+        for (const s of studentsToRender) {
+          const rec = getAttendanceRecord ? (getAttendanceRecord(s.id) as any) : undefined
+          if (rec?.kind === '보강' && rec.makeup_of_attendance_id) {
+            const id = rec.makeup_of_attendance_id as number
+            if (!originalClassByAttendanceId[id]) targetIds.push(id)
+          }
+        }
+        if (targetIds.length === 0) return
+        const unique = Array.from(new Set(targetIds))
+        const { data, error } = await supabase
+          .from('attendance')
+          .select('id, classes:classes(date, time)')
+          .in('id', unique)
+        if (error) throw error
+        const next = { ...originalClassByAttendanceId }
+        ;(data || []).forEach((row: any) => {
+          if (row?.id && row?.classes?.date && row?.classes?.time) {
+            next[row.id as number] = { date: row.classes.date as string, time: row.classes.time as string }
+          }
+        })
+        setOriginalClassByAttendanceId(next)
+      } catch (e) {
+        console.error('원본 정규 수업 로드 실패:', e)
+      }
+    }
+    run()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentsToRender.map(s=>s.id).join(','), classItem.class_id, selectedDate.getTime()])
 
   // 월별 출석 데이터 로드 (이 카드의 학생들 대상, selectedDate의 월 기준)
   useEffect(() => {
@@ -637,9 +674,13 @@ export default function DailyClassCard({
                     const disp = getDisplayStatus ? getDisplayStatus(student.id) : undefined
                     const isMakeup = disp?.startsWith('MAKEUP_') || disp?.startsWith('REGULAR_MAKEUP_')
                     if (!isMakeup) return null
+                    const rec = getAttendanceRecord ? (getAttendanceRecord(student.id) as any) : undefined
+                    const linkId = rec?.makeup_of_attendance_id as number | undefined
+                    const org = linkId ? originalClassByAttendanceId[linkId] : undefined
+                    const label = org ? `${format(new Date(org.date), 'MM/dd', { locale: ko })} ${toHm(org.time)} 수업 보강` : '보강'
                     return (
                       <Badge type="color" className={'bg-blue-50 text-blue-700 border-blue-200'}>
-                        보강
+                        {label}
                       </Badge>
                     )
                   })()}
@@ -658,9 +699,18 @@ export default function DailyClassCard({
                         )
                       }
                       if (rec?.kind === '보강') {
+                        const linkId = rec?.makeup_of_attendance_id as number | undefined
+                        const org = linkId ? originalClassByAttendanceId[linkId] : undefined
+                        if (org) {
+                          return (
+                            <span className="text-xs text-blue-700">
+                              {`${format(new Date(org.date), 'MM/dd', { locale: ko })} ${toHm(org.time)} 수업 보강`}
+                            </span>
+                          )
+                        }
                         return (
                           <span className="text-xs text-blue-700">
-                            {`${format(selectedDate, 'MM/dd', { locale: ko })} ${toHm(classItem.time)} 수업 보강`}
+                            보강
                           </span>
                         )
                       }
