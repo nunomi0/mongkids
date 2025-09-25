@@ -148,7 +148,7 @@ export default function DailyClassCard({
       if (ids.length === 0) { setEnriched([]); return }
       const { data, error } = await supabase
         .from('students')
-        .select('id, name, birth_date, current_level')
+        .select('id, name, birth_date, current_level, is_test')
         .in('id', ids)
       if (error) { console.error(error); return }
       const computeGrade = (birthDate: string) => getGradeLabel(birthDate)
@@ -670,6 +670,23 @@ export default function DailyClassCard({
                   </span>
                   <Badge type="grade">{student.grade}</Badge>
                   <LevelBadge level={student.level as any} />
+                  {(() => {
+                    const rec = getAttendanceRecord ? (getAttendanceRecord(student.id) as any) : undefined
+                    const tRaw = (rec?.is_test || '').toString().trim().toUpperCase()
+                    if (!tRaw) return null
+                    const label = `${tRaw} 테스트`
+                    const colorClass = tRaw === 'WHITE' ? 'bg-gray-50 text-gray-700 border-gray-200'
+                      : tRaw === 'YELLOW' ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                      : tRaw === 'GREEN' ? 'bg-green-50 text-green-700 border-green-200'
+                      : tRaw === 'BLUE' ? 'bg-blue-50 text-blue-700 border-blue-200'
+                      : tRaw === 'RED' ? 'bg-red-50 text-red-700 border-red-200'
+                      : tRaw === 'BLACK' ? 'bg-slate-900 text-white border-slate-800'
+                      : tRaw === 'GOLD' ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : 'bg-muted text-muted-foreground'
+                    return (
+                      <Badge type="color" className={colorClass}>{label}</Badge>
+                    )
+                  })()}
                   {(() => {
                     const disp = getDisplayStatus ? getDisplayStatus(student.id) : undefined
                     const isMakeup = disp?.startsWith('MAKEUP_') || disp?.startsWith('REGULAR_MAKEUP_')

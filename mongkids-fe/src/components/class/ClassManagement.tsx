@@ -479,6 +479,7 @@ export default function ClassManagement() {
             kind,
             makeup_of_attendance_id,
             note,
+            is_test,
             students:students(
               id, 
               name, 
@@ -519,7 +520,7 @@ export default function ClassManagement() {
       console.log('[ClassManagement] daily mapped', mapped)
       setDailyClasses(mapped)
       // attendance 맵 구성 및 정규→보강 링크 수집
-      const nextMap: Record<string, { id: number; student_id: number; class_id: number; date: string; status: '예정'|'출석'|'결석'; kind: '정규'|'보강'; makeup_of_attendance_id: number | null; note?: string | null }> = {}
+      const nextMap: Record<string, { id: number; student_id: number; class_id: number; date: string; status: '예정'|'출석'|'결석'; kind: '정규'|'보강'; makeup_of_attendance_id: number | null; note?: string | null; is_test?: string | null }> = {}
       const regularIds: number[] = []
       ;(data || []).forEach((c: any) => {
         const classId = c.id as number
@@ -535,6 +536,7 @@ export default function ClassManagement() {
             kind: (a.kind === '보강' ? '보강' : '정규') as '정규'|'보강',
             makeup_of_attendance_id: a.makeup_of_attendance_id ?? null,
             note: (a as any).note ?? null,
+            is_test: (a as any).is_test ?? null,
           }
           if (a.kind !== '보강') {
             regularIds.push(a.id as number)
