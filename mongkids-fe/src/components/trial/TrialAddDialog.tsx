@@ -26,7 +26,8 @@ export default function TrialAddDialog({ isOpen, onClose, onAdded }: Props) {
 		if (!form.name || !form.phone || !selectedDate) return
 
 		try {
-			const dateStr = selectedDate.toISOString().split('T')[0]
+            // UTC 변환으로 하루 전으로 저장되는 문제 방지: 로컬 기준 yyyy-MM-dd 생성
+            const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth()+1).padStart(2,'0')}-${String(selectedDate.getDate()).padStart(2,'0')}`
 			const time = selectedTime + ':00'
 			
 			console.log('클래스 검색 조건:', { date: dateStr, time: time, group_type: '체험' })

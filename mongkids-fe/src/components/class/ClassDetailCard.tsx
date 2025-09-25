@@ -15,6 +15,7 @@ import { getDisplayStyle, canToggleStatus } from "../../utils/attendanceStatus"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog"
 import { Plus, MoreHorizontal, Trash2 } from "lucide-react"
 import TrialDetailModal from "../trial/TrialDetailModal"
+import TrialAddDialog from "../trial/TrialAddDialog"
 import { filterByKoreanSearch } from "../../utils/korean"
 
 interface Student {
@@ -114,6 +115,7 @@ export default function DailyClassCard({
   const [trialReservations, setTrialReservations] = useState<TrialReservation[]>([])  // 체험자 목록
   const [isTrialDetailOpen, setIsTrialDetailOpen] = useState(false)
   const [selectedTrialId, setSelectedTrialId] = useState<number | null>(null)
+  const [isTrialAddOpen, setIsTrialAddOpen] = useState(false)
   // 보강 ↔ 정규 연결된 원본 수업의 날짜/시간 캐시
   const [originalClassByAttendanceId, setOriginalClassByAttendanceId] = useState<Record<number, { date: string; time: string }>>({})
   // 정규 → 연결된 보강(예정) 수업의 날짜/시간 캐시 (정규 카드에서 "보강 예정" 표시용)
@@ -121,20 +123,21 @@ export default function DailyClassCard({
 
   // 체험자 목록 로드 (group_type이 '체험'인 경우)
   useEffect(() => {
-    if (classItem.group_type === '체험') {
-      loadTrialReservations()
-    }
-  }, [classItem.class_id, classItem.group_type])
+    // 클래스 변경 시 항상 trial_reservations에서 현재 class_id로 조회
+    loadTrialReservations()
+  }, [classItem.class_id])
 
   const loadTrialReservations = async () => {
     try {
       const { data, error } = await supabase
         .from('trial_reservations')
-        .select('id, name, grade')
+        .select('id, name, grade, class_id, classes:classes(id, date, time, group_type)')
+        .not('class_id', 'is', null)
         .eq('class_id', classItem.class_id)
         .order('name')
       
       if (error) throw error
+      console.log('[ClassDetailCard] trial reservations', { classId: classItem.class_id, count: (data||[]).length, data })
       setTrialReservations(data || [])
     } catch (error) {
       console.error('체험자 목록 로드 실패:', error)
@@ -472,7 +475,7 @@ export default function DailyClassCard({
                 <div className="flex flex-col p-1 min-w-[140px]">
                   <button
                     className="w-full text-left px-3 py-2 text-sm hover:bg-accent/50 rounded whitespace-nowrap cursor-pointer"
-                    onClick={(e)=>{ e.stopPropagation(); setIsActionsOpen(false); setIsAddOpen(true) }}
+                    onClick={(e)=>{ e.stopPropagation(); setIsActionsOpen(false); classItem.group_type === '체험' ? setIsTrialAddOpen(true) : setIsAddOpen(true) }}
                   >
                     학생 추가
                   </button>
@@ -572,10 +575,41 @@ export default function DailyClassCard({
             <Dialog open={isRemoveOpen} onOpenChange={setIsRemoveOpen}>
               <DialogContent type="s">
                 <DialogHeader>
-                  <DialogTitle>학생 삭제</DialogTitle>
+                  <DialogTitle>{classItem.group_type === '체험' ? '체험자 삭제' : '학생 삭제'}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-2 max-h-80 overflow-y-auto">
-                  {studentsToRender.length > 0 ? studentsToRender.map(s => (
+                  {classItem.group_type === '체험' ? (
+                    trialReservations.length > 0 ? trialReservations.map(tr => (
+                      <div key={tr.id} className="flex items-center justify-between p-2 border rounded">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{tr.name}</span>
+                          <Badge type="grade">{tr.grade}</Badge>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 hover:bg-red-50"
+                          onClick={async ()=>{
+                            try {
+                              const { error } = await supabase
+                                .from('trial_reservations')
+                                .delete()
+                                .eq('id', tr.id)
+                              if (error) throw error
+                              await loadTrialReservations()
+                            } catch (e) {
+                              console.error('체험자 삭제 실패:', e)
+                            }
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4 mr-1" /> 삭제
+                        </Button>
+                      </div>
+                    )) : (
+                      <div className="text-sm text-muted-foreground">삭제할 체험자가 없습니다.</div>
+                    )
+                  ) : (
+                    studentsToRender.length > 0 ? studentsToRender.map(s => (
                     <div key={s.id} className="flex items-center justify-between p-2 border rounded">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{s.name}</span>
@@ -623,10 +657,11 @@ export default function DailyClassCard({
                       >
                         <Trash2 className="w-4 h-4 mr-1" /> 삭제
                       </Button>
-                    </div>
-                  )) : (
+                      </div>
+                    )) : (
                     <div className="text-sm text-muted-foreground">삭제할 학생이 없습니다.</div>
-                  )}
+                  )
+                )}
                 </div>
               </DialogContent>
             </Dialog>
@@ -646,30 +681,34 @@ export default function DailyClassCard({
           <div className="space-y-3">
             {/* 체험자 목록 (group_type이 '체험'인 경우) */}
             {classItem.group_type === '체험' ? (
-              trialReservations.map((trial) => (
-                <div 
-                  key={trial.id}
-                  className="flex items-center justify-between p-2 rounded border transition-colors bg-blue-50 border-blue-200"
-                >
-                  <div className="flex items-center gap-3">
-                    <span 
-                      role="button"
-                      tabIndex={0}
-                      className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-                      onClick={() => {
-                        setSelectedTrialId(trial.id)
-                        setIsTrialDetailOpen(true)
-                      }}
-                    >
-                      {trial.name}
-                    </span>
-                    <Badge type="grade">{trial.grade}</Badge>
-                    <Badge type="studenttype">
-                      체험
-                    </Badge>
+              trialReservations.length > 0 ? (
+                trialReservations.map((trial) => (
+                  <div 
+                    key={trial.id}
+                    className="flex items-center justify-between p-2 rounded border transition-colors bg-blue-50 border-blue-200"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span 
+                        role="button"
+                        tabIndex={0}
+                        className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                        onClick={() => {
+                          setSelectedTrialId(trial.id)
+                          setIsTrialDetailOpen(true)
+                        }}
+                      >
+                        {trial.name}
+                      </span>
+                      <Badge type="grade">{trial.grade}</Badge>
+                      <Badge type="studenttype">
+                        체험
+                      </Badge>
+                    </div>
                   </div>
-                </div>
-              ))
+                ))
+              ) : (
+                <div className="text-sm text-muted-foreground">체험자가 없습니다.</div>
+              )
             ) : (
               studentsToRender.map((student) => (
                 <React.Fragment key={student.id}>
@@ -824,6 +863,15 @@ export default function DailyClassCard({
       }}
       reservationId={selectedTrialId}
     />
+
+      {/* 체험자 추가 모달 */}
+      <TrialAddDialog
+        isOpen={isTrialAddOpen}
+        onClose={() => setIsTrialAddOpen(false)}
+        onAdded={async () => {
+          await loadTrialReservations()
+        }}
+      />
 
     {/* 보강 수업 편성 모달 */}
     <Dialog open={isLinkOpen} onOpenChange={setIsLinkOpen}>
