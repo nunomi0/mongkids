@@ -694,12 +694,6 @@ export default function DailyClassCard({
                     const rec = getAttendanceRecord ? (getAttendanceRecord(student.id) as any) : undefined
                     const linkId = rec?.makeup_of_attendance_id as number | undefined
                     const org = linkId ? originalClassByAttendanceId[linkId] : undefined
-                    const label = org ? `${format(new Date(org.date), 'MM/dd', { locale: ko })} ${toHm(org.time)} 수업 보강` : '보강'
-                    return (
-                      <Badge type="color" className={'bg-blue-50 text-blue-700 border-blue-200'}>
-                        {label}
-                      </Badge>
-                    )
                   })()}
                 </div>
                 <div className="flex flex-col items-end gap-2">

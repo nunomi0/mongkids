@@ -29,7 +29,6 @@ import TrialDetailModal from "../trial/TrialDetailModal"
 
 export default function ClassManagement() {
   const [activeTab, setActiveTab] = useState("ongoing")
-  const [currentTime, setCurrentTime] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [scheduleWeek, setScheduleWeek] = useState<{start: Date, end: Date}>({
     start: new Date(),
@@ -789,30 +788,16 @@ export default function ClassManagement() {
     }
   }
 
-  // 현재 시간 업데이트
+  // 자동 갱신 제거 (타이머 삭제)
+
+  // 초기 선택값 설정 (마운트 시 1회)
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 60000) // 1분마다 업데이트
-
-    return () => clearInterval(timer)
-  }, [])
-
-  // 초기 선택값 설정 (현재 요일과 시간)
-  useEffect(() => {
-    const currentDay = currentTime.getDay()
-    const currentHour = currentTime.getHours()
-    
-
-    
-    // 현재 주차 설정 (전체 수업 시간표용)
-    const weekRange = getWeekRange(currentTime)
+    const now = new Date()
+    const weekRange = getWeekRange(now)
     setScheduleWeek(weekRange)
-    setSelectedDate(currentTime)
-    
-    // 초기 일별 수업 로드
-    loadDailyClasses(currentTime)
-  }, [currentTime])
+    setSelectedDate(now)
+    loadDailyClasses(now)
+  }, [])
 
   // 학년 우선순위 (높은 숫자가 높은 우선순위)
   const getGradePriority = (grade: string) => {
