@@ -149,7 +149,7 @@ export default function ClassManagement() {
         if (attendanceUpserts.length) {
           const { error } = await supabase
             .from('attendance')
-            .upsert(attendanceUpserts, { onConflict: 'student_id,class_id' })
+            .upsert(attendanceUpserts.map(a => ({ ...a, kind: '정규' })), { onConflict: 'student_id,class_id' })
           if (error) throw error
         }
       }
@@ -240,7 +240,8 @@ export default function ClassManagement() {
         const minimal = attendanceUpserts.map(a => ({
           student_id: a.student_id,
           class_id: a.class_id,
-          status: '예정' as const
+          status: '예정' as const,
+          kind: '정규' as const
         }))
         const { error } = await supabase
           .from('attendance')
@@ -341,7 +342,8 @@ export default function ClassManagement() {
         const minimal = attendanceUpserts.map(a => ({
           student_id: a.student_id,
           class_id: a.class_id,
-          status: '예정' as const
+          status: '예정' as const,
+          kind: '정규' as const
         }))
         const { error } = await supabase
           .from('attendance')
@@ -1209,7 +1211,16 @@ export default function ClassManagement() {
                                           {cls.students.length > 0 ? (
                                             <div className="text-xs flex flex-col gap-1">
                                               {cls.students.map(s => (
-                                                <div key={s.id} className="flex items-center gap-2">
+                                                <div
+                                                  key={s.id}
+                                                  className={`flex items-center gap-2 px-1 py-0.5 rounded ${(() => {
+                                                    const sid = s.id
+                                                    const dateKey = dateStr
+                                                    const att = attendanceStatus[sid]?.[dateKey]
+                                                    // 보강 예정인 경우 박스 전체 하늘색 배경
+                                                    return att === 'makeup' ? 'bg-blue-50' : ''
+                                                  })()}`}
+                                                >
                                                   {s.isTrial ? (
                                                     <span 
                                                       className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
@@ -1222,7 +1233,13 @@ export default function ClassManagement() {
                                                       {s.name}
                                                     </span>
                                                   ) : (
-                                                    <span className="font-medium">{s.name}</span>
+                                                    <span className={`font-medium ${(() => {
+                                                      const sid = s.id
+                                                      const dateKey = dateStr
+                                                      const att = attendanceStatus[sid]?.[dateKey]
+                                                      // 보강 예정/결석은 취소선 + 흐림
+                                                      return (att === 'makeup' || att === 'absent') ? 'text-muted-foreground line-through' : ''
+                                                    })()}`}>{s.name}</span>
                                                   )}
                                                   <Badge type="grade">{s.grade || ''}</Badge>
                                                   {s.isTrial ? (

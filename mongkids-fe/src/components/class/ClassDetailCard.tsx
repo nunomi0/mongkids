@@ -116,6 +116,8 @@ export default function DailyClassCard({
   const [selectedTrialId, setSelectedTrialId] = useState<number | null>(null)
   // 보강 ↔ 정규 연결된 원본 수업의 날짜/시간 캐시
   const [originalClassByAttendanceId, setOriginalClassByAttendanceId] = useState<Record<number, { date: string; time: string }>>({})
+  // 정규 → 연결된 보강(예정) 수업의 날짜/시간 캐시 (정규 카드에서 "보강 예정" 표시용)
+  const [makeupPlannedByRegularId, setMakeupPlannedByRegularId] = useState<Record<number, { date: string; time: string }>>({})
 
   // 체험자 목록 로드 (group_type이 '체험'인 경우)
   useEffect(() => {
@@ -203,6 +205,38 @@ export default function DailyClassCard({
         setOriginalClassByAttendanceId(next)
       } catch (e) {
         console.error('원본 정규 수업 로드 실패:', e)
+      }
+    }
+    run()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentsToRender.map(s=>s.id).join(','), classItem.class_id, selectedDate.getTime()])
+
+  // 정규 출석에 연결된 보강(예정) 수업 날짜/시간 로드
+  useEffect(() => {
+    const run = async () => {
+      try {
+        // 화면에 표시되는 학생들의 정규 출석 id 수집
+        const regularIds: number[] = []
+        for (const s of studentsToRender) {
+          const rec = getAttendanceRecord ? (getAttendanceRecord(s.id) as any) : undefined
+          if (rec?.kind === '정규' && rec?.id) regularIds.push(rec.id as number)
+        }
+        if (regularIds.length === 0) return
+        const unique = Array.from(new Set(regularIds))
+        const { data, error } = await supabase
+          .from('attendance')
+          .select('id, makeup_of_attendance_id, status, classes:classes(date, time)')
+          .in('makeup_of_attendance_id', unique)
+        if (error) throw error
+        const next: Record<number, { date: string; time: string }> = {}
+        ;(data || []).forEach((row: any) => {
+          if (row?.makeup_of_attendance_id && row?.status === '예정' && row?.classes?.date && row?.classes?.time) {
+            next[row.makeup_of_attendance_id as number] = { date: row.classes.date as string, time: row.classes.time as string }
+          }
+        })
+        setMakeupPlannedByRegularId(next)
+      } catch (e) {
+        console.error('보강 예정 수업 로드 실패:', e)
       }
     }
     run()
@@ -672,6 +706,17 @@ export default function DailyClassCard({
                   <LevelBadge level={student.level as any} />
                   {(() => {
                     const rec = getAttendanceRecord ? (getAttendanceRecord(student.id) as any) : undefined
+                    if (rec?.kind === '보강') {
+                      return (
+                        <Badge type="color" className={'bg-blue-50 text-blue-700 border-blue-200'}>
+                          보강
+                        </Badge>
+                      )
+                    }
+                    return null
+                  })()}
+                  {(() => {
+                    const rec = getAttendanceRecord ? (getAttendanceRecord(student.id) as any) : undefined
                     const tRaw = (rec?.is_test || '').toString().trim().toUpperCase()
                     if (!tRaw) return null
                     const label = `${tRaw} 테스트`
@@ -703,10 +748,16 @@ export default function DailyClassCard({
                       const rec = getAttendanceRecord ? (getAttendanceRecord(student.id) as any) : undefined
                       const disp = getDisplayStatus ? getDisplayStatus(student.id) : undefined
                       if (rec?.kind === '정규' && disp === 'REGULAR_MAKEUP_PLANNED') {
+                        const mk = makeupPlannedByRegularId[rec.id as number]
+                        if (mk) {
+                          return (
+                            <span className="text-xs text-blue-700">
+                              {`${format(new Date(mk.date), 'MM/dd', { locale: ko })} ${toHm(mk.time)} 보강 예정`}
+                            </span>
+                          )
+                        }
                         return (
-                          <span className="text-xs text-blue-700">
-                            {`${format(selectedDate, 'MM/dd', { locale: ko })} ${toHm(classItem.time)} 보강 예정`}
-                          </span>
+                          <span className="text-xs text-blue-700">보강 예정</span>
                         )
                       }
                       if (rec?.kind === '보강') {

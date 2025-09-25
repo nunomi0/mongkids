@@ -28,7 +28,9 @@ export function nextStatus(current: Status): Status {
   return '예정';
 }
 
-export function canToggleStatus(kind: Kind, hasLinkedMakeup: boolean): boolean {
+export function canToggleStatus(kind: Kind, status: Status, hasLinkedMakeup: boolean): boolean {
+  // 보강 예정은 클릭 비활성화
+  if (kind === '보강' && status === '예정') return false;
   // 정규는 보강 연결 시 UI 토글 불가(정규는 보강 표시 전용)
   if (kind === '정규' && hasLinkedMakeup) return false;
   return true;
@@ -39,6 +41,8 @@ export function computeDisplayStatus(
   status: Status,
   hasLinkedMakeup: boolean
 ): DisplayStatus {
+  // 보강 예정은 하늘색(보강)으로 표시
+  if (kind === '보강' && status === '예정') return '보강';
   if (kind === '정규' && hasLinkedMakeup) return '보강';
   return status;
 }
