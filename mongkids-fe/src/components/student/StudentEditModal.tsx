@@ -275,10 +275,9 @@ export default function StudentEditModal({ isOpen, onClose, student, classTypes,
             </div>
 
             {/* 액션 */}
-            <div className="flex items-center justify-between p-4 pt-2">
+            <div className="flex items-center justify-end gap-2">
               <Button 
-                variant="outline" 
-                className="text-red-600" 
+                variant="destructive" 
                 onClick={()=>{ setConfirmName(''); setDeleteOpen(true) }}
               >
                 학생 삭제

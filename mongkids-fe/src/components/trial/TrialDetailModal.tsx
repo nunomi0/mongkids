@@ -9,6 +9,7 @@ import { getGradeLabel } from "../../utils/grade"
 import MemoEditor from "../MemoEditor"
 import { Input } from "../ui/input"
 import { Trash2 } from "lucide-react"
+import DeleteStudentDialog from "../student/DeleteStudentDialog"
 
 type TrialReservation = {
   id: number
@@ -53,6 +54,8 @@ export default function TrialDetailModal({
   })
   const [deleteName, setDeleteName] = useState("")
   const [isDeleting, setIsDeleting] = useState(false)
+  const [confirmName, setConfirmName] = useState("")
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   useEffect(() => {
     if (isOpen && reservationId) {
@@ -185,7 +188,6 @@ export default function TrialDetailModal({
 
   const handleDelete = async () => {
     if (!reservation) return
-    if (deleteName.trim() !== reservation.name) return
     try {
       setIsDeleting(true)
       const { error } = await supabase
@@ -329,30 +331,7 @@ export default function TrialDetailModal({
                   </div>
                 </div>
 
-                {/* 삭제 섹션 */}
-                <div className="mt-2 p-3 rounded border bg-red-50/50">
-                  <div className="flex items-center gap-2 text-red-700 font-medium mb-2">
-                    <Trash2 className="w-4 h-4" /> 체험자 삭제
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-2">확인을 위해 체험자 이름을 입력하세요.</p>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      placeholder={reservation.name}
-                      value={deleteName}
-                      onChange={(e)=> setDeleteName(e.target.value)}
-                      className="h-8"
-                    />
-                    <Button
-                      variant="outline"
-                      className="text-red-600 hover:bg-red-100"
-                      disabled={deleteName.trim() !== reservation.name || isDeleting}
-                      onClick={handleDelete}
-                    >
-                      삭제
-                    </Button>
-                  </div>
-                </div>
-                
+              
                 <div className="text-sm">
                   <span className="text-muted-foreground">전화번호:</span>
                   {isEditMode ? (
@@ -433,20 +412,23 @@ export default function TrialDetailModal({
                 )}
               </CardContent>
             </Card>
-
-            <div className="flex justify-end gap-2">
+            <div className="flex items-center justify-end gap-2">
               {isEditMode ? (
                 <>
-                  <Button variant="outline" onClick={handleCancel}>
-                    취소
+                  <Button 
+                    variant="destructive" 
+                    onClick={()=> setDeleteOpen(true)}
+                  >
+                    체험자 삭제
                   </Button>
-                  <Button onClick={handleSave} disabled={loading}>
-                    저장
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={handleCancel}>취소</Button>
+                    <Button onClick={handleSave} disabled={loading}>저장</Button>
+                  </div>
                 </>
               ) : (
                 <>
-                  <Button variant="outline" onClick={()=> setIsEditMode(true)}>정보 수정</Button>
+                  <Button variant="outline" onClick={()=> setIsEditMode(true)}>편집</Button>
                 </>
               )}
             </div>
@@ -455,6 +437,16 @@ export default function TrialDetailModal({
           <div className="p-6 text-center text-muted-foreground">체험자 정보를 찾을 수 없습니다.</div>
         )}
       </DialogContent>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <DeleteStudentDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        confirmName={confirmName}
+        setConfirmName={setConfirmName}
+        studentName={reservation?.name || ''}
+        onConfirm={handleDelete}
+      />
     </Dialog>
   )
 }
