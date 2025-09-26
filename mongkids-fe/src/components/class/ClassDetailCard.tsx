@@ -177,24 +177,27 @@ export default function DailyClassCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classItem.class_id, classItem.students])
 
-  // '보강 예정'이나 '결석'인 학생을 제외한 학생 목록
+  // 모든 학생 목록 (결석 학생도 포함)
   const studentsToRender = useMemo(() => {
-    const baseStudents = enriched || classItem.students
-    return baseStudents.filter(student => {
+    return enriched || classItem.students
+  }, [enriched, classItem.students])
+
+  // 총 인원수 계산용 (결석 학생 제외)
+  const activeStudentsCount = useMemo(() => {
+    return studentsToRender.filter(student => {
       const rec = getAttendanceRecord ? (getAttendanceRecord(student.id) as any) : undefined
       if (!rec) return true // 출석 기록이 없으면 포함
       
       const kind = (rec?.kind || '정규') as '정규'|'보강'
       const status = (rec?.status || '예정') as '예정'|'출석'|'결석'
-      const hasLinked = kind === '정규' && !!rec?.makeup_of_attendance_id
       
       // '보강 예정' (보강이고 예정인 경우) 또는 '결석'인 경우 제외
       if (kind === '보강' && status === '예정') return false
       if (status === '결석') return false
       
       return true
-    })
-  }, [enriched, classItem.students, getAttendanceRecord])
+    }).length
+  }, [studentsToRender, getAttendanceRecord])
 
   // 보강 수업의 원본(정규) 수업 날짜/시간 로드
   useEffect(() => {
@@ -692,7 +695,7 @@ export default function DailyClassCard({
         <div>
           <div className="flex items-center justify-between mb-2">
             <p className="font-medium">
-              {classItem.group_type === '체험' ? `체험자 (${trialReservations.length}명)` : `참여 학생 (${classItem.students.length}명)`}
+              {classItem.group_type === '체험' ? `체험자 (${trialReservations.length}명)` : `참여 학생 (${activeStudentsCount}명)`}
             </p>
           </div>
           <div className="space-y-3">
