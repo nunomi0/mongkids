@@ -836,8 +836,8 @@ export default function ClassManagement() {
 
   // 주의 시작일과 끝일 계산
   const getWeekRange = (date: Date) => {
-    const start = startOfWeek(date, { weekStartsOn: 0 }) // 일요일부터 시작
-    const end = endOfWeek(date, { weekStartsOn: 0 }) // 토요일까지
+    const start = startOfWeek(date, { weekStartsOn: 1 }) // 일요일부터 시작
+    const end = endOfWeek(date, { weekStartsOn: 8 }) // 토요일까지
     
     return { start, end }
   }
@@ -1130,7 +1130,7 @@ export default function ClassManagement() {
                       }}
                       numberOfMonths={1}
                       defaultMonth={scheduleWeek.start}
-                      weekStartsOn={0}
+                      weekStartsOn={1}
                       className="rounded-md border"
                       modifiers={{
                         selected: (date) => {
@@ -1154,7 +1154,7 @@ export default function ClassManagement() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-24">시간</TableHead>
-                        {["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"].map((day) => (
+                        {["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"].map((day) => (
                         <TableHead key={day} className="text-center min-w-32">
                           {day}
                         </TableHead>
