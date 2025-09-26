@@ -1206,7 +1206,15 @@ export default function ClassManagement() {
                                                 {cls.time?.slice(0,5)}
                                               </span>
                                             </div>
-                                            <Badge variant="outline" className="text-xs mt-1">{cls.students.length}명</Badge>
+                                            <Badge variant="outline" className="text-xs mt-1">
+                                              {cls.students.filter(s => {
+                                                const sid = s.id
+                                                const dateKey = dateStr
+                                                const att = attendanceStatus[sid]?.[dateKey]
+                                                // '보강 예정'이나 '결석'인 학생 제외
+                                                return att !== 'makeup' && att !== 'absent'
+                                              }).length}명
+                                            </Badge>
                                           </div>
                                           {cls.students.length > 0 ? (
                                             <div className="text-xs flex flex-col gap-1">
