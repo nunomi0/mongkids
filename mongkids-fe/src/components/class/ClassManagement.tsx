@@ -123,6 +123,8 @@ export default function ClassManagement() {
         daySchedules.forEach(s => {
           const time = s.time
           const group = s.group_type
+          // 체험 수업은 자동 생성 대상에서 제외 (실제 예약이 있을 때만 별도 생성/표시)
+          if (group === '체험') return
           const key = `${dateStr}_${time}_${group}`
           if (!uniqueKey.has(key)) {
             uniqueKey.add(key)
@@ -146,6 +148,8 @@ export default function ClassManagement() {
 
           // 해당 날짜의 각 스케줄 → attendance 예정 upsert
           for (const s of daySchedules) {
+            // 체험 수업은 자동 출석 생성 제외
+            if (s.group_type === '체험') continue
             const key = `${dateStr}_${s.time}_${s.group_type}`
             const classId = classIdByKey.get(key)
             if (!classId) continue
@@ -224,6 +228,8 @@ export default function ClassManagement() {
         daySchedules.forEach(s => {
           const time = s.time
           const group = s.group_type
+          // 체험 수업은 자동 생성 대상에서 제외 (실제 예약이 있을 때만 별도 생성/표시)
+          if (group === '체험') return
           const key = `${dateStr}_${time}_${group}`
           if (!uniqueKey.has(key)) {
             uniqueKey.add(key)
@@ -247,6 +253,8 @@ export default function ClassManagement() {
 
           // 해당 날짜의 각 스케줄 → attendance 예정 upsert
           for (const s of daySchedules) {
+            // 체험 수업은 자동 출석 생성 제외
+            if (s.group_type === '체험') continue
             const key = `${dateStr}_${s.time}_${s.group_type}`
             const classId = classIdByKey.get(key)
             if (!classId) continue
@@ -611,7 +619,7 @@ export default function ClassManagement() {
 
   const toDateStr = (d: Date) => `${d.getFullYear()}-${`${d.getMonth()+1}`.padStart(2,'0')}-${`${d.getDate()}`.padStart(2,'0')}`
 
-  const realTimeSlots: string[] = Array.from(new Set(realSchedule
+  const realTimeSlots: string[] = Array.from(new Set<string>(realSchedule
     .filter(r => weekDates.some(d => toDateStr(d) === r.date))
     .map(r => r.time as string))).sort()
 
@@ -1069,7 +1077,7 @@ export default function ClassManagement() {
                           return (
                             <TableHead 
                               key={day} 
-                              className={`text-center min-w-32 ${isWeekend ? (index === 5 ? 'bg-blue-50 text-blue-800' : 'bg-red-50 text-red-800') : ''}`}
+                              className={`text-center min-w-32 ${isWeekend ? (index === 5 ? 'bg-blue-50 text-blue-800' : 'bg-red-50 text-red-500') : ''}`}
                             >
                               {day}
                             </TableHead>
