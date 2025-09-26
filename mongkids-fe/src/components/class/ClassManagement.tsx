@@ -84,92 +84,11 @@ export default function ClassManagement() {
   }
 
 
-  // 특정 날짜 출석예정 생성
-  const generateAttendanceForDate = async (date: Date) => {
-    try {
-      setIsGenerating(true)
-      const dateStr = toDateStr(date)
-      const weekday = (date.getDay() + 6) % 7 // 0:월 ~ 6:일 (DB 규약에 맞춤)
-
-      // 1) 재원 학생과 해당 요일 스케줄 로드
-      const { data: students, error: sErr } = await supabase
-        .from('students')
-        .select('id, status')
-        .eq('status', '재원')
-      if (sErr) throw sErr
-      const studentIds = (students || []).map(s => s.id)
-      if (studentIds.length === 0) return
-
-      const { data: schedules, error: schErr } = await supabase
-        .from('student_schedules')
-        .select('*')
-        .in('student_id', studentIds)
-        .eq('weekday', weekday)
-      if (schErr) throw schErr
-
-      if (schedules.length === 0) {
-        alert('해당 날짜에 수업이 있는 학생이 없습니다.')
-        return
-      }
-
-      // 2) 해당 날짜의 클래스 upsert
-      const uniqueKey = new Set<string>()
-      const classesForDay: { date: string; time: string; group_type: GroupType }[] = []
-      schedules.forEach(s => {
-        const time = s.time
-        const group = s.group_type
-        const key = `${dateStr}_${time}_${group}`
-        if (!uniqueKey.has(key)) {
-          uniqueKey.add(key)
-          classesForDay.push({ date: dateStr, time, group_type: group })
-        }
-      })
-
-      if (classesForDay.length) {
-        // upsert classes
-        const { data: upserted, error } = await supabase
-          .from('classes')
-          .upsert(classesForDay, { onConflict: 'date,time,group_type' })
-          .select('id, date, time, group_type')
-        if (error) throw error
-
-        // class_id 매핑
-        const classIdByKey = new Map<string, number>()
-        ;(upserted || []).forEach(c => {
-          classIdByKey.set(`${c.date}_${c.time}_${c.group_type}`, c.id)
-        })
-
-        // attendance 예정 upsert
-        const attendanceUpserts = schedules.map(s => {
-          const key = `${dateStr}_${s.time}_${s.group_type}`
-          const classId = classIdByKey.get(key)
-          return { student_id: s.student_id, class_id: classId, status: '예정' as const }
-        }).filter(a => a.class_id)
-
-        if (attendanceUpserts.length) {
-          const { error } = await supabase
-            .from('attendance')
-            .upsert(attendanceUpserts.map(a => ({ ...a, kind: '정규' })), { onConflict: 'student_id,class_id' })
-          if (error) throw error
-        }
-      }
-
-      alert('출석 예정 생성이 완료되었습니다.')
-      // 생성 후 일별 수업 데이터 갱신
-      await loadDailyClasses(date)
-    } catch (e) {
-      console.error('출석 예정 생성 오류:', e)
-      alert('출석 예정 생성 중 오류가 발생했습니다. 콘솔을 확인해주세요.')
-    } finally {
-      setIsGenerating(false)
-    }
-  }
 
   // 특정 주차 출석예정 생성
   const generateAttendanceForWeek = async (start: Date, end: Date) => {
     try {
       setIsGenerating(true)
-      const toDateStr = (d: Date) => `${d.getFullYear()}-${`${d.getMonth()+1}`.padStart(2,'0')}-${`${d.getDate()}`.padStart(2,'0')}`
 
       // 1) 재원 학생과 스케줄 로드
       const { data: students, error: sErr } = await supabase
@@ -290,7 +209,6 @@ export default function ClassManagement() {
       const attendanceUpserts: { student_id: number; class_id: number; status: string; is_makeup: boolean; memo: string | null }[] = []
 
       // Helper: YYYY-MM-DD
-      const toDateStr = (d: Date) => `${d.getFullYear()}-${`${d.getMonth()+1}`.padStart(2,'0')}-${`${d.getDate()}`.padStart(2,'0')}`
 
       // 날짜 루프
       for (let d = new Date(start); d <= end; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
@@ -365,7 +283,6 @@ export default function ClassManagement() {
   // 실제 데이터 로드 (선택 주간)
   const loadRealSchedule = async (start: Date, end: Date) => {
     try {
-      const toDateStr = (d: Date) => `${d.getFullYear()}-${`${d.getMonth()+1}`.padStart(2,'0')}-${`${d.getDate()}`.padStart(2,'0')}`
       const startStr = toDateStr(start)
       const endStr = toDateStr(end)
 
@@ -694,9 +611,9 @@ export default function ClassManagement() {
 
   const toDateStr = (d: Date) => `${d.getFullYear()}-${`${d.getMonth()+1}`.padStart(2,'0')}-${`${d.getDate()}`.padStart(2,'0')}`
 
-  const realTimeSlots = Array.from(new Set(realSchedule
+  const realTimeSlots: string[] = Array.from(new Set(realSchedule
     .filter(r => weekDates.some(d => toDateStr(d) === r.date))
-    .map(r => r.time))).sort()
+    .map(r => r.time as string))).sort()
 
   const openManageDialog = async (cls: { class_id: number; date: string; time: string; group_type: GroupType; students: { id: number; name: string }[] }) => {
     setManageClass(cls)
@@ -836,17 +753,17 @@ export default function ClassManagement() {
 
   // 주의 시작일과 끝일 계산
   const getWeekRange = (date: Date) => {
-    const start = startOfWeek(date, { weekStartsOn: 1 }) // 일요일부터 시작
-    const end = endOfWeek(date, { weekStartsOn: 8 }) // 토요일까지
+    const start = startOfWeek(date, { weekStartsOn: 1 }) // 월요일부터 시작
+    const end = endOfWeek(date, { weekStartsOn: 1 }) // 일요일까지
     
     return { start, end }
   }
 
-  // 해당 날짜의 (해당 달 기준) 주차 계산 - 일요일 시작
+  // 해당 날짜의 (해당 달 기준) 주차 계산 - 월요일 시작
   const getWeekOfMonth = (date: Date) => {
     const firstOfMonth = startOfMonth(date)
-    const firstWeekStart = startOfWeek(firstOfMonth, { weekStartsOn: 0 })
-    const currentWeekStart = startOfWeek(date, { weekStartsOn: 0 })
+    const firstWeekStart = startOfWeek(firstOfMonth, { weekStartsOn: 1 })
+    const currentWeekStart = startOfWeek(date, { weekStartsOn: 1 })
     const diffMs = currentWeekStart.getTime() - firstWeekStart.getTime()
     const week = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000)) + 1
     return week
@@ -947,7 +864,7 @@ export default function ClassManagement() {
   // 특정 월 기준 주차 인덱스의 주 시작/끝
   const getWeekRangeByIndex = (baseDate: Date, index: number) => {
     const firstOfMonth = startOfMonth(baseDate)
-    const firstWeekStart = startOfWeek(firstOfMonth, { weekStartsOn: 0 })
+    const firstWeekStart = startOfWeek(firstOfMonth, { weekStartsOn: 1 })
     const start = new Date(firstWeekStart.getTime() + index * 7 * 24 * 60 * 60 * 1000)
     const end = new Date(start.getTime() + 6 * 24 * 60 * 60 * 1000)
     return { start, end }
@@ -1092,14 +1009,7 @@ export default function ClassManagement() {
               ) : (
                 <Card>
                   <CardContent className="p-6 text-center">
-                    <p className="text-muted-foreground mb-4">선택한 날짜에 진행 중인 수업이 없습니다.</p>
-                    <Button 
-                      onClick={() => generateAttendanceForDate(selectedDate)}
-                      disabled={isGenerating}
-                      className="bg-primary hover:bg-primary/90"
-                    >
-                      {isGenerating ? "생성 중..." : "출석부 생성"}
-                    </Button>
+                    <p className="text-muted-foreground">선택한 날짜에 진행 중인 수업이 없습니다.</p>
                   </CardContent>
                 </Card>
               )}
@@ -1154,18 +1064,24 @@ export default function ClassManagement() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-24">시간</TableHead>
-                        {["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"].map((day) => (
-                        <TableHead key={day} className="text-center min-w-32">
-                          {day}
-                        </TableHead>
-                      ))}
+                        {["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"].map((day, index) => {
+                          const isWeekend = index >= 5 // 토요일, 일요일
+                          return (
+                            <TableHead 
+                              key={day} 
+                              className={`text-center min-w-32 ${isWeekend ? (index === 5 ? 'bg-blue-50 text-blue-800' : 'bg-red-50 text-red-800') : ''}`}
+                            >
+                              {day}
+                            </TableHead>
+                          )
+                        })}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                       {realTimeSlots.map((timeSlot) => (
                         <TableRow key={timeSlot}>
                           <TableCell>{timeSlot.slice(0, 5)}</TableCell>
-                          {["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].map((dayKey, colIdx) => {
+                          {["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map((dayKey, colIdx) => {
                             const dateStr = toDateStr(weekDates[colIdx])
                             const classesForCell = realSchedule
                               .filter(r => r.date === dateStr && r.time === timeSlot)
@@ -1173,7 +1089,7 @@ export default function ClassManagement() {
                             return (
                               <TableCell
                                 key={dayKey}
-                                className="p-2"
+                                className={`p-2 ${colIdx >= 5 ? (colIdx === 5 ? 'bg-blue-50' : 'bg-red-50') : ''}`}
                                 onContextMenu={(e) => {
                                   e.preventDefault()
                                   e.stopPropagation()
