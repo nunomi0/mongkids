@@ -60,6 +60,7 @@
   :root, :host {
     --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    --color-red-100: oklch(0.804 0.0999 25.331);
     --color-red-500: oklch(.637 .237 25.331);
     --color-orange-100: oklch(.954 .038 75.164);
     --color-orange-800: oklch(.47 .157 37.304);
@@ -1478,6 +1479,10 @@
 
   .bg-green-100 {
     background-color: var(--color-green-100);
+  }
+
+  .bg-red-100 {
+    background-color: var(--color-red-100);
   }
 
   .bg-indigo-100 {

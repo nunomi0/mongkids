@@ -22,6 +22,12 @@ type TrialReservation = {
   note: string | null
   gender: string | null
   grade: string | null
+  classes?: {
+    id: number
+    date: string
+    time: string
+    group_type: string
+  }
 }
 
 export default function TrialManagement() {
@@ -120,17 +126,6 @@ export default function TrialManagement() {
               value={month}
               onChange={(e)=> setMonth(e.target.value)}
             />
-            <div className="flex items-center gap-1">
-              {(['전체','예정','노쇼','미등록','등록'] as const).map(k => (
-                <button
-                  key={k}
-                  className={`px-2 py-1 rounded border text-xs ${statusFilter[k] ? 'bg-primary/5 border-primary/30' : 'bg-muted/50'}`}
-                  onClick={()=> setStatusFilter(prev => ({ ...prev, [k]: !prev[k] }))}
-                >
-                  {k}
-                </button>
-              ))}
-            </div>
             <Button onClick={()=> setIsAddOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               체험 예약 등록
@@ -179,16 +174,7 @@ export default function TrialManagement() {
                         <TableCell>{reservation.classes?.date || '-'}</TableCell>
                         <TableCell>{reservation.classes?.time ? reservation.classes.time.slice(0,5) : '-'}</TableCell>
                         <TableCell>
-                          <Badge 
-                            variant="outline" 
-                            className={
-                              reservation.status === '예정' ? 'bg-white text-gray-800 border-gray-200' :
-                              reservation.status === '노쇼' ? 'bg-red-50 text-red-700 border-red-200' :
-                              reservation.status === '미등록' ? 'bg-gray-50 text-gray-700 border-gray-200' :
-                              reservation.status === '등록' ? 'bg-green-50 text-green-700 border-green-200' :
-                              'bg-gray-50 text-gray-700 border-gray-200'
-                            }
-                          >
+                          <Badge type="trialstatus">
                             {reservation.status}
                           </Badge>
                         </TableCell>

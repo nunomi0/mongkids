@@ -23,6 +23,7 @@ const badgeVariants = cva(
         studentstatus: "",
         studenttype: "",
         grade: "",
+        trialstatus: "",
         default: "",
       },
     },
@@ -93,6 +94,21 @@ const getColorByText = (text: string, type: string) => {
         return 'bg-gray-100 text-gray-800 border-gray-200';
       }
     
+    case 'trialstatus':
+      switch (lowerText) {
+        case '예정':
+          return 'bg-white text-gray-800 border-gray-200';
+        case '노쇼':
+          return 'bg-red-100 text-red-800 border-red-500';
+        case '미등록':
+          return 'bg-gray-100 text-gray-800 border-green-200';
+        case '등록':
+          return 'bg-green-100 text-green-800 border-green-200';
+
+        default:
+          return 'bg-gray-100 text-gray-800 border-gray-200';
+      }
+    
     case 'color':
       // 직접 색상 지정용
       return text;
@@ -112,7 +128,7 @@ function Badge({
 }: React.ComponentProps<"span"> &
   VariantProps<typeof badgeVariants> & { 
     asChild?: boolean;
-    type?: "color" | "studentstatus" | "studenttype" | "grade" | "default";
+    type?: "color" | "studentstatus" | "studenttype" | "grade" | "trialstatus" | "default";
   }) {
   const Comp = asChild ? Slot : "span";
   
@@ -121,11 +137,14 @@ function Badge({
     ? getColorByText(children, type)
     : "";
 
+  // 커스텀 색상이 있으면 variant 스타일을 무시
+  const hasCustomColor = colorClass !== "";
+
   return (
     <Comp
       data-slot="badge"
       className={cn(
-        badgeVariants({ variant, type }), 
+        hasCustomColor ? badgeVariants({ variant: "default", type }) : badgeVariants({ variant, type }), 
         colorClass,
         className
       )}

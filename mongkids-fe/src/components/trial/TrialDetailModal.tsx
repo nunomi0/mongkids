@@ -334,7 +334,7 @@ export default function TrialDetailModal({
                   <div className="flex items-center gap-2 text-red-700 font-medium mb-2">
                     <Trash2 className="w-4 h-4" /> 체험자 삭제
                   </div>
-                  <p className="text-xs text-muted-foreground mb-2">안전 확인을 위해 체험자 이름을 입력하세요.</p>
+                  <p className="text-xs text-muted-foreground mb-2">확인을 위해 체험자 이름을 입력하세요.</p>
                   <div className="flex items-center gap-2">
                     <Input
                       placeholder={reservation.name}
@@ -446,9 +446,7 @@ export default function TrialDetailModal({
                 </>
               ) : (
                 <>
-                  <Button variant="outline" onClick={() => setIsEditMode(true)}>
-                    편집
-                  </Button>
+                  <Button variant="outline" onClick={()=> setIsEditMode(true)}>정보 수정</Button>
                 </>
               )}
             </div>
