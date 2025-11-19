@@ -1,8 +1,20 @@
-export default function Students() {
-    return (
-      <div>
-       <h1>학생 관리</h1>
-      </div>
-    );
-  }
-  
+import StudentsClient from "./students-client"
+
+export default async function StudentsPage({
+  searchParams,
+}: {
+  searchParams: { query?: string }
+}) {
+  const searchQuery = searchParams.query || ""
+
+  const students = [
+    { id: 1, name: "민지", grade: 5, phone: "010-1111-2222", status: "재원" },
+    { id: 2, name: "서연", grade: 3, phone: "010-3333-4444", status: "휴원" },
+  ]
+
+  return (
+    <div className="p-6">
+      <StudentsClient students={students} initialQuery={searchQuery} />
+    </div>
+  )
+}
