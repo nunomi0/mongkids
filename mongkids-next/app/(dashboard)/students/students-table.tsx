@@ -1,3 +1,4 @@
+import { memo } from "react"
 import {
   Table,
   TableBody,
@@ -20,7 +21,7 @@ const columns = [
   { key: "status", label: "상태" },
 ]
 
-export default function StudentsTable({ students }) {
+function StudentsTable({ students, onRowClick }: { students: any[], onRowClick: (id: number) => void }) {
   return (
     <div className="w-full overflow-x-auto">
       <Table className="w-full min-w-full table-fixed">
@@ -34,7 +35,11 @@ export default function StudentsTable({ students }) {
 
         <TableBody>
           {students.map((s) => (
-            <TableRow key={s.id}>
+            <TableRow
+              key={s.id}
+              className="cursor-pointer"
+              onClick={() => onRowClick(s.id)}
+            >
               {columns.map((col) => (
                 <TableCell key={col.key}>{s[col.key]}</TableCell>
               ))}
@@ -45,3 +50,5 @@ export default function StudentsTable({ students }) {
     </div>
   )
 }
+
+export default memo(StudentsTable)
