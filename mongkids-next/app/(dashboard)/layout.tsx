@@ -1,13 +1,14 @@
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
+import { AppSidebar } from "@/components/app-sidebar"
+
+export default function DashBoardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko">
-      <body>
-          <div>{children}</div>
-      </body>
-    </html>
-  );
+    <SidebarProvider>
+      <AppSidebar />
+      <main>
+        <SidebarTrigger />
+        {children}
+      </main>
+    </SidebarProvider>
+  )
 }
