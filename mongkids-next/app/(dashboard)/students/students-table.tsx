@@ -7,6 +7,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import StatusBadge from "@/components/status-badge"
+import type { StudentStatus } from "@/types/student"
 
 const columns = [
   { key: "name", label: "이름" },
@@ -41,10 +43,24 @@ function StudentsTable({ students, onRowClick }: { students: any[], onRowClick: 
               onClick={() => onRowClick(s.id)}
             >
               {columns.map((col) => (
-                <TableCell key={col.key}>{s[col.key]}</TableCell>
+                <TableCell key={col.key}>
+                  {col.key === "status" && s.status ? (
+                    <StatusBadge status={s.status as StudentStatus} />
+                  ) : (
+                    s[col.key]
+                  )}
+                </TableCell>
               ))}
             </TableRow>
           ))}
+
+          {students.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={columns.length} className="text-center text-muted-foreground py-6">
+                학생이 없습니다
+              </TableCell>
+            </TableRow>
+          )}
         </TableBody>
       </Table>
     </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -8,6 +8,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { ChevronDown } from "lucide-react"
 
 import ProfileSection from "./sections/profile"
 import LevelSection from "./sections/level"
@@ -18,12 +25,14 @@ import AddPaymentModal from "./add-payment-modal"
 import EditPaymentModal from "./edit-payment-modal"
 import EditLevelModal from "./edit-level-modal"
 import ConfirmDialog from "@/components/ui/confirm-dialog"
+import StatusBadge from "@/components/status-badge"
 import type {
   Student,
   ClassType,
   PaymentFormData,
   Payment,
   LevelHistory,
+  StudentStatus,
 } from "@/types/student"
 
 // 임시 더미 데이터 - 나중에 Supabase에서 가져올 예정
@@ -34,23 +43,6 @@ const DUMMY_CLASS_TYPES: ClassType[] = [
   { id: 4, category: "어린이 주 3회", sessions_per_week: 3 },
   { id: 5, category: "체험", sessions_per_week: 1 },
 ]
-
-// 임시 더미 학생 데이터
-const DUMMY_STUDENT: Student = {
-  id: 1,
-  name: "박지영",
-  birth_date: "1992-09-07",
-  phone: "010-1234-5697",
-  class_type_id: 1,
-  gender: "여",
-  status: "재원",
-  shoe_size: "",
-  memo: "",
-  schedules: [
-    { weekday: 3, time: "19:00", group_type: "일반2" },
-    { weekday: 5, time: "19:00", group_type: "일반1" },
-  ],
-}
 
 // 임시 더미 결제 데이터
 const DUMMY_PAYMENTS: Payment[] = [
@@ -88,26 +80,6 @@ const DUMMY_PAYMENTS: Payment[] = [
     discounts: [],
     memo: "",
   },
-  {
-    id: 4,
-    student_id: 1,
-    payment_date: "2025-08-05",
-    target_month: "2025-08",
-    amount: 145000,
-    method: "스포츠바우처",
-    discounts: [],
-    memo: "",
-  },
-  {
-    id: 5,
-    student_id: 1,
-    payment_date: "2025-07-02",
-    target_month: "2025-07",
-    amount: 140000,
-    method: "계좌이체",
-    discounts: [],
-    memo: "",
-  },
 ]
 
 // 임시 더미 레벨 이력 데이터
@@ -121,17 +93,46 @@ const DUMMY_LEVEL_HISTORIES: LevelHistory[] = [
   { level: "GOLD", acquired_at: null },
 ]
 
+const STATUS_ACTIONS: { status: StudentStatus; label: string; description: string }[] = [
+  { status: "재원", label: "재원으로 변경", description: "학생을 재원 상태로 변경합니다." },
+  { status: "휴원", label: "휴원 처리", description: "학생을 휴원 처리합니다. 수업이 일시 중단됩니다." },
+  { status: "퇴원", label: "퇴원 처리", description: "학생을 퇴원 처리합니다. 이 작업은 되돌릴 수 있습니다." },
+  { status: "체험", label: "체험으로 변경", description: "학생을 체험 상태로 변경합니다." },
+]
+
 export default function StudentDetailModal({
   isOpen,
   onClose,
   studentId,
+  student: studentFromList,
+  onStatusChange,
 }: {
   isOpen: boolean
   onClose: () => void
   studentId: number | null
+  student: any | null
+  onStatusChange: (studentId: number, status: StudentStatus) => void
 }) {
-  // 학생 정보
-  const [student, setStudent] = useState<Student>(DUMMY_STUDENT)
+  // 학생 정보 (목록에서 전달받은 데이터 사용)
+  const [student, setStudent] = useState<Student | null>(null)
+
+  // 목록에서 전달받은 학생 정보로 초기화
+  useEffect(() => {
+    if (studentFromList && isOpen) {
+      setStudent({
+        id: studentFromList.id,
+        name: studentFromList.name || "",
+        birth_date: studentFromList.birth_date || "",
+        phone: studentFromList.phone || "",
+        class_type_id: studentFromList.class_type_id || 1,
+        gender: studentFromList.gender || "남",
+        status: studentFromList.status || "재원",
+        shoe_size: studentFromList.shoe_size || "",
+        memo: studentFromList.memo || "",
+        schedules: studentFromList.schedules || [],
+      })
+    }
+  }, [studentFromList, isOpen])
 
   // 결제 내역
   const [payments, setPayments] = useState<Payment[]>(DUMMY_PAYMENTS)
@@ -145,9 +146,13 @@ export default function StudentDetailModal({
   const [editPaymentOpen, setEditPaymentOpen] = useState(false)
   const [editLevelOpen, setEditLevelOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [statusConfirmOpen, setStatusConfirmOpen] = useState(false)
 
   // 선택된 결제 (수정/삭제용)
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null)
+
+  // 변경할 상태
+  const [pendingStatus, setPendingStatus] = useState<StudentStatus | null>(null)
 
   // 모달 열기/닫기 콜백 메모이제이션
   const openEditModal = useCallback(() => setEditOpen(true), [])
@@ -169,6 +174,11 @@ export default function StudentDetailModal({
     setSelectedPayment(null)
   }, [])
 
+  const closeStatusConfirm = useCallback(() => {
+    setStatusConfirmOpen(false)
+    setPendingStatus(null)
+  }, [])
+
   // 학생 정보 수정
   const handleStudentSaved = useCallback((updatedStudent: Student) => {
     setStudent(updatedStudent)
@@ -176,6 +186,7 @@ export default function StudentDetailModal({
 
   // 결제 추가
   const handlePaymentAdded = useCallback((paymentData: PaymentFormData) => {
+    if (!student) return
     const newPayment: Payment = {
       id: Date.now(),
       student_id: student.id,
@@ -187,7 +198,7 @@ export default function StudentDetailModal({
       memo: paymentData.memo,
     }
     setPayments((prev) => [newPayment, ...prev])
-  }, [student.id])
+  }, [student])
 
   // 결제 수정 모달 열기
   const handleEditPayment = useCallback((payment: Payment) => {
@@ -221,10 +232,36 @@ export default function StudentDetailModal({
     setLevelHistories(histories)
   }, [])
 
+  // 상태 변경 요청
+  const handleStatusChangeRequest = useCallback((newStatus: StudentStatus) => {
+    if (!student || student.status === newStatus) return
+    setPendingStatus(newStatus)
+    setStatusConfirmOpen(true)
+  }, [student])
+
+  // 상태 변경 확정
+  const handleStatusChangeConfirm = useCallback(() => {
+    if (!student || !pendingStatus) return
+
+    // 로컬 상태 업데이트
+    setStudent((prev) => prev ? { ...prev, status: pendingStatus } : null)
+
+    // 부모 컴포넌트에 알림 (목록 업데이트)
+    onStatusChange(student.id, pendingStatus)
+
+    setPendingStatus(null)
+  }, [student, pendingStatus, onStatusChange])
+
   // 삭제 확인 메시지
   const deleteDescription = selectedPayment
     ? `${selectedPayment.payment_date} 결제 내역을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`
     : ""
+
+  // 상태 변경 확인 메시지
+  const statusAction = STATUS_ACTIONS.find((a) => a.status === pendingStatus)
+  const statusDescription = statusAction?.description || ""
+
+  if (!student) return null
 
   return (
     <>
@@ -234,12 +271,41 @@ export default function StudentDetailModal({
           <div className="h-[90vh] overflow-y-auto p-6 space-y-6">
 
             <DialogHeader>
-              <DialogTitle>학생 상세 정보</DialogTitle>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <DialogTitle>학생 상세 정보</DialogTitle>
+                  <StatusBadge status={student.status} />
+                </div>
+
+                {/* 상태 변경 드롭다운 */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      상태 변경
+                      <ChevronDown className="ml-1 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {STATUS_ACTIONS.map((action) => (
+                      <DropdownMenuItem
+                        key={action.status}
+                        onClick={() => handleStatusChangeRequest(action.status)}
+                        disabled={student.status === action.status}
+                      >
+                        {action.label}
+                        {student.status === action.status && (
+                          <span className="ml-2 text-muted-foreground">(현재)</span>
+                        )}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </DialogHeader>
 
             <div className="flex gap-4 items-stretch">
               <div className="flex-1">
-                <ProfileSection className="h-full" />
+                <ProfileSection className="h-full" student={student} />
               </div>
               <div className="flex-1">
                 <LevelSection
@@ -309,6 +375,18 @@ export default function StudentDetailModal({
         confirmText="삭제"
         cancelText="취소"
         variant="destructive"
+      />
+
+      {/* 상태 변경 확인 다이얼로그 */}
+      <ConfirmDialog
+        isOpen={statusConfirmOpen}
+        onClose={closeStatusConfirm}
+        onConfirm={handleStatusChangeConfirm}
+        title={statusAction?.label || "상태 변경"}
+        description={statusDescription}
+        confirmText="변경"
+        cancelText="취소"
+        variant="default"
       />
     </>
   )
