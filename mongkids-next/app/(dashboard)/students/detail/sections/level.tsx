@@ -1,3 +1,4 @@
+import { memo } from "react"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import LevelBadge, { LEVEL_ORDER, LevelValue } from "@/components/level-badge"
@@ -11,7 +12,7 @@ type Props = {
   onEdit: () => void
 }
 
-export default function LevelSection({ className, histories, onEdit }: Props) {
+function LevelSection({ className, histories, onEdit }: Props) {
   return (
     <Card className={cn(className)}>
       <CardHeader className="p-4 flex flex-row items-center justify-between">
@@ -53,3 +54,5 @@ export default function LevelSection({ className, histories, onEdit }: Props) {
     </Card>
   )
 }
+
+export default memo(LevelSection)

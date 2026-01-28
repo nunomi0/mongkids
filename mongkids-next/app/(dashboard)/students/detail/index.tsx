@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import {
   Dialog,
   DialogContent,
@@ -149,14 +149,33 @@ export default function StudentDetailModal({
   // 선택된 결제 (수정/삭제용)
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null)
 
+  // 모달 열기/닫기 콜백 메모이제이션
+  const openEditModal = useCallback(() => setEditOpen(true), [])
+  const closeEditModal = useCallback(() => setEditOpen(false), [])
+
+  const openPaymentModal = useCallback(() => setPaymentOpen(true), [])
+  const closePaymentModal = useCallback(() => setPaymentOpen(false), [])
+
+  const openEditLevelModal = useCallback(() => setEditLevelOpen(true), [])
+  const closeEditLevelModal = useCallback(() => setEditLevelOpen(false), [])
+
+  const closeEditPaymentModal = useCallback(() => {
+    setEditPaymentOpen(false)
+    setSelectedPayment(null)
+  }, [])
+
+  const closeDeleteConfirm = useCallback(() => {
+    setDeleteConfirmOpen(false)
+    setSelectedPayment(null)
+  }, [])
+
   // 학생 정보 수정
-  const handleStudentSaved = (updatedStudent: Student) => {
+  const handleStudentSaved = useCallback((updatedStudent: Student) => {
     setStudent(updatedStudent)
-    console.log("학생 정보 수정됨:", updatedStudent)
-  }
+  }, [])
 
   // 결제 추가
-  const handlePaymentAdded = (paymentData: PaymentFormData) => {
+  const handlePaymentAdded = useCallback((paymentData: PaymentFormData) => {
     const newPayment: Payment = {
       id: Date.now(),
       student_id: student.id,
@@ -168,43 +187,44 @@ export default function StudentDetailModal({
       memo: paymentData.memo,
     }
     setPayments((prev) => [newPayment, ...prev])
-    console.log("결제 추가됨:", newPayment)
-  }
+  }, [student.id])
 
   // 결제 수정 모달 열기
-  const handleEditPayment = (payment: Payment) => {
+  const handleEditPayment = useCallback((payment: Payment) => {
     setSelectedPayment(payment)
     setEditPaymentOpen(true)
-  }
+  }, [])
 
   // 결제 수정 저장
-  const handlePaymentUpdated = (updatedPayment: Payment) => {
+  const handlePaymentUpdated = useCallback((updatedPayment: Payment) => {
     setPayments((prev) =>
       prev.map((p) => (p.id === updatedPayment.id ? updatedPayment : p))
     )
     setSelectedPayment(null)
-    console.log("결제 수정됨:", updatedPayment)
-  }
+  }, [])
 
   // 결제 삭제 확인 모달 열기
-  const handleDeletePayment = (payment: Payment) => {
+  const handleDeletePayment = useCallback((payment: Payment) => {
     setSelectedPayment(payment)
     setDeleteConfirmOpen(true)
-  }
+  }, [])
 
   // 결제 삭제 실행
-  const handlePaymentDeleted = () => {
+  const handlePaymentDeleted = useCallback(() => {
     if (!selectedPayment) return
     setPayments((prev) => prev.filter((p) => p.id !== selectedPayment.id))
-    console.log("결제 삭제됨:", selectedPayment)
     setSelectedPayment(null)
-  }
+  }, [selectedPayment])
 
   // 레벨 이력 수정
-  const handleLevelHistoriesSaved = (histories: LevelHistory[]) => {
+  const handleLevelHistoriesSaved = useCallback((histories: LevelHistory[]) => {
     setLevelHistories(histories)
-    console.log("레벨 이력 수정됨:", histories)
-  }
+  }, [])
+
+  // 삭제 확인 메시지
+  const deleteDescription = selectedPayment
+    ? `${selectedPayment.payment_date} 결제 내역을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`
+    : ""
 
   return (
     <>
@@ -225,7 +245,7 @@ export default function StudentDetailModal({
                 <LevelSection
                   className="h-full"
                   histories={levelHistories}
-                  onEdit={() => setEditLevelOpen(true)}
+                  onEdit={openEditLevelModal}
                 />
               </div>
             </div>
@@ -239,8 +259,8 @@ export default function StudentDetailModal({
             />
 
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditOpen(true)}>정보 수정</Button>
-              <Button onClick={() => setPaymentOpen(true)}>결제 추가</Button>
+              <Button variant="outline" onClick={openEditModal}>정보 수정</Button>
+              <Button onClick={openPaymentModal}>결제 추가</Button>
             </div>
           </div>
         </DialogContent>
@@ -249,7 +269,7 @@ export default function StudentDetailModal({
       {/* 학생 정보 수정 모달 */}
       <EditStudentModal
         isOpen={editOpen}
-        onClose={() => setEditOpen(false)}
+        onClose={closeEditModal}
         onSaved={handleStudentSaved}
         student={student}
         classTypes={DUMMY_CLASS_TYPES}
@@ -258,7 +278,7 @@ export default function StudentDetailModal({
       {/* 결제 추가 모달 */}
       <AddPaymentModal
         isOpen={paymentOpen}
-        onClose={() => setPaymentOpen(false)}
+        onClose={closePaymentModal}
         onSaved={handlePaymentAdded}
         studentName={student.name}
       />
@@ -266,10 +286,7 @@ export default function StudentDetailModal({
       {/* 결제 수정 모달 */}
       <EditPaymentModal
         isOpen={editPaymentOpen}
-        onClose={() => {
-          setEditPaymentOpen(false)
-          setSelectedPayment(null)
-        }}
+        onClose={closeEditPaymentModal}
         onSaved={handlePaymentUpdated}
         payment={selectedPayment}
       />
@@ -277,7 +294,7 @@ export default function StudentDetailModal({
       {/* 레벨 이력 수정 모달 */}
       <EditLevelModal
         isOpen={editLevelOpen}
-        onClose={() => setEditLevelOpen(false)}
+        onClose={closeEditLevelModal}
         onSaved={handleLevelHistoriesSaved}
         histories={levelHistories}
       />
@@ -285,13 +302,10 @@ export default function StudentDetailModal({
       {/* 결제 삭제 확인 다이얼로그 */}
       <ConfirmDialog
         isOpen={deleteConfirmOpen}
-        onClose={() => {
-          setDeleteConfirmOpen(false)
-          setSelectedPayment(null)
-        }}
+        onClose={closeDeleteConfirm}
         onConfirm={handlePaymentDeleted}
         title="결제 삭제"
-        description={`${selectedPayment?.payment_date} 결제 내역을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
+        description={deleteDescription}
         confirmText="삭제"
         cancelText="취소"
         variant="destructive"

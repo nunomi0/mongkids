@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback, useMemo } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
@@ -30,15 +30,35 @@ export default function StudentsClient({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [students, setStudents] = useState(initialStudents)
 
-  const filtered = students.filter(s =>
-    s.name?.toLowerCase().includes(query.toLowerCase()) ||
-    s.phone?.includes(query)
+  // 필터링 결과 메모이제이션
+  const filtered = useMemo(() =>
+    students.filter(s =>
+      s.name?.toLowerCase().includes(query.toLowerCase()) ||
+      s.phone?.includes(query)
+    ),
+    [students, query]
   )
 
-  const handleStudentSaved = (formData: StudentFormData, schedules: StudentSchedule[]) => {
-    // 임시로 로컬 상태에 추가 (나중에 Supabase 연동 시 수정)
+  // 콜백 메모이제이션
+  const handleRowClick = useCallback((id: number) => {
+    setSelectedId(id)
+  }, [])
+
+  const handleDetailClose = useCallback(() => {
+    setSelectedId(null)
+  }, [])
+
+  const handleAddModalOpen = useCallback(() => {
+    setIsAddModalOpen(true)
+  }, [])
+
+  const handleAddModalClose = useCallback(() => {
+    setIsAddModalOpen(false)
+  }, [])
+
+  const handleStudentSaved = useCallback((formData: StudentFormData, schedules: StudentSchedule[]) => {
     const newStudent = {
-      id: Date.now(), // 임시 ID
+      id: Date.now(),
       name: formData.name,
       phone: formData.phone,
       status: formData.status,
@@ -49,8 +69,9 @@ export default function StudentsClient({
       schedules,
     }
     setStudents((prev) => [newStudent, ...prev])
-    console.log("학생 추가됨:", newStudent)
-  }
+  }, [])
+
+  const isDetailOpen = selectedId !== null
 
   return (
     <>
@@ -62,7 +83,7 @@ export default function StudentsClient({
             onChange={(e) => setQuery(e.target.value)}
             className="flex-1"
           />
-          <Button onClick={() => setIsAddModalOpen(true)}>
+          <Button onClick={handleAddModalOpen}>
             <Plus className="h-4 w-4 mr-1" />
             학생 등록
           </Button>
@@ -70,21 +91,21 @@ export default function StudentsClient({
 
         <StudentsTable
           students={filtered}
-          onRowClick={(id) => setSelectedId(id)}
+          onRowClick={handleRowClick}
         />
       </div>
 
       {/* 상세 모달 */}
       <StudentDetailModal
-        isOpen={!!selectedId}
+        isOpen={isDetailOpen}
         studentId={selectedId}
-        onClose={() => setSelectedId(null)}
+        onClose={handleDetailClose}
       />
 
       {/* 학생 추가 모달 */}
       <AddStudentModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={handleAddModalClose}
         onSaved={handleStudentSaved}
         classTypes={DUMMY_CLASS_TYPES}
       />

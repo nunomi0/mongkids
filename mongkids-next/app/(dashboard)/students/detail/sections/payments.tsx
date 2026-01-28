@@ -1,5 +1,6 @@
 "use client"
 
+import { memo } from "react"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import {
   Table,
@@ -29,7 +30,7 @@ function formatCurrency(value: number) {
   return value.toLocaleString("ko-KR") + "원"
 }
 
-export default function PaymentsSection({ payments, onEdit, onDelete }: Props) {
+function PaymentsSection({ payments, onEdit, onDelete }: Props) {
   return (
     <Card>
       <CardHeader>
@@ -106,3 +107,5 @@ export default function PaymentsSection({ payments, onEdit, onDelete }: Props) {
     </Card>
   )
 }
+
+export default memo(PaymentsSection)
