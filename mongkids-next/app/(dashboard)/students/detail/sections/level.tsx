@@ -1,12 +1,13 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import LevelBadge, { LEVEL_ORDER } from "@/components/level-badge"
+import LevelBadge, { LEVEL_ORDER, LevelValue } from "@/components/level-badge"
+import { cn } from "@/lib/utils"
 
 type LevelHistory = {
   level: string
   acquired_at: string | null
 }
 
-export default function LevelSection() {
+export default function LevelSection({ className }: { className?: string }) {
   // ===== 더미 데이터 =====
   const histories: LevelHistory[] = [
     { level: "WHITE", acquired_at: "2024-01-10" },
@@ -19,7 +20,7 @@ export default function LevelSection() {
   ]
 
   return (
-    <Card>
+    <Card className={cn(className)}>
       <CardHeader className="p-4">
         <CardTitle className="text-sm font-medium">레벨 이력</CardTitle>
       </CardHeader>
@@ -34,7 +35,7 @@ export default function LevelSection() {
               <div key={level} className="flex items-center gap-3">
 
                 {/* 색상 배지 */}
-                <LevelBadge level={level as any} size={14} radius={3} />
+                <LevelBadge level={level as LevelValue} size={14} radius={3} />
 
                 {/* 레벨 텍스트 */}
                 <span className="text-xs font-medium w-12">{level}</span>

@@ -83,19 +83,10 @@ export default function AttendanceSection() {
 
               return (
                 <TableRow key={item.id}>
-                  {/* 날짜 */}
                   <TableCell>{item.date}</TableCell>
-
-                  {/* 요일 */}
                   <TableCell>{weekday}</TableCell>
-
-                  {/* 시간 */}
                   <TableCell>{item.time}</TableCell>
-
-                  {/* 정규 / 보강 */}
                   <TableCell>{item.type}</TableCell>
-
-                  {/* 출석 상태 드롭다운 */}
                   <TableCell>
                     <Select
                       defaultValue={item.status}
@@ -113,19 +104,14 @@ export default function AttendanceSection() {
                       </SelectContent>
                     </Select>
                   </TableCell>
-
-                  {/* 메모 */}
                   <TableCell className="flex items-center justify-between">
                     {item.note || "-"}
-
-                    {/* 액션 버튼 */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0 ml-2">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem>보강 편성</DropdownMenuItem>
                         <DropdownMenuItem>메모 수정</DropdownMenuItem>

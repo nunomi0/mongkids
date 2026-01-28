@@ -74,7 +74,7 @@ export default function PaymentsSection() {
               <TableHead>금액</TableHead>
               <TableHead>결제수단</TableHead>
               <TableHead>할인</TableHead>
-              <TableHead className="w-10"></TableHead> {/* 메뉴 자리 */}
+              <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
 
@@ -97,8 +97,6 @@ export default function PaymentsSection() {
                     <span className="text-muted-foreground">-</span>
                   )}
                 </TableCell>
-
-                {/* ⋮ 메뉴 */}
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

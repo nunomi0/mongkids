@@ -1,8 +1,9 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { cn } from "@/lib/utils"
 
-export default function ProfileSection() {
+export default function ProfileSection({ className }: { className?: string }) {
   return (
-    <Card>
+    <Card className={cn(className)}>
       <CardHeader>
         <CardTitle>기본 정보</CardTitle>
       </CardHeader>
