@@ -9,56 +9,27 @@ import {
   TableBody,
   TableCell
 } from "@/components/ui/table"
-
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { MoreHorizontal } from "lucide-react"
+import type { Payment } from "@/types/student"
 
-const payments = [
-  {
-    date: "2025-10-01",
-    month: "2025년 10월",
-    amount: "155,000원",
-    method: "계좌이체",
-    discounts: [],
-  },
-  {
-    date: "2025-09-11",
-    month: "2025년 9월",
-    amount: "0원",
-    method: "계좌이체",
-    discounts: ["신발 -10,000", "형제자매 -10,000", "추가 -123,123"],
-  },
-  {
-    date: "2025-09-11",
-    month: "2025년 9월",
-    amount: "856,878원",
-    method: "계좌이체",
-    discounts: ["신발 -10,000", "형제자매 -10,000", "추가 -123,123"],
-  },
-  {
-    date: "2025-09-08",
-    month: "2025년 9월",
-    amount: "150,000원",
-    method: "카드결제",
-    discounts: [],
-  },
-  {
-    date: "2025-08-05",
-    month: "2025년 8월",
-    amount: "145,000원",
-    method: "스포츠바우처",
-    discounts: [],
-  },
-  {
-    date: "2025-07-02",
-    month: "2025년 7월",
-    amount: "140,000원",
-    method: "계좌이체",
-    discounts: [],
-  },
-]
+type Props = {
+  payments: Payment[]
+  onEdit: (payment: Payment) => void
+  onDelete: (payment: Payment) => void
+}
 
-export default function PaymentsSection() {
+function formatMonth(value: string) {
+  if (!value) return ""
+  const [year, month] = value.split("-")
+  return `${year}년 ${parseInt(month)}월`
+}
+
+function formatCurrency(value: number) {
+  return value.toLocaleString("ko-KR") + "원"
+}
+
+export default function PaymentsSection({ payments, onEdit, onDelete }: Props) {
   return (
     <Card>
       <CardHeader>
@@ -79,18 +50,18 @@ export default function PaymentsSection() {
           </TableHeader>
 
           <TableBody>
-            {payments.map((p, idx) => (
-              <TableRow key={idx}>
-                <TableCell>{p.date}</TableCell>
-                <TableCell>{p.month}</TableCell>
-                <TableCell>{p.amount}</TableCell>
+            {payments.map((p) => (
+              <TableRow key={p.id}>
+                <TableCell>{p.payment_date}</TableCell>
+                <TableCell>{formatMonth(p.target_month)}</TableCell>
+                <TableCell>{formatCurrency(p.amount)}</TableCell>
                 <TableCell>{p.method}</TableCell>
 
                 <TableCell>
                   {p.discounts.length > 0 ? (
                     <ul className="text-sm text-muted-foreground space-y-1">
                       {p.discounts.map((d, i) => (
-                        <li key={i}>{d}</li>
+                        <li key={i}>{d.type} -{formatCurrency(d.amount)}</li>
                       ))}
                     </ul>
                   ) : (
@@ -106,10 +77,13 @@ export default function PaymentsSection() {
                     </DropdownMenuTrigger>
 
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => console.log("수정", p)}>
+                      <DropdownMenuItem onClick={() => onEdit(p)}>
                         수정
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => console.log("삭제", p)}>
+                      <DropdownMenuItem
+                        onClick={() => onDelete(p)}
+                        className="text-red-600"
+                      >
                         삭제
                       </DropdownMenuItem>
                     </DropdownMenuContent>

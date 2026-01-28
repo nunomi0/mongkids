@@ -1,28 +1,24 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import LevelBadge, { LEVEL_ORDER, LevelValue } from "@/components/level-badge"
+import { Pencil } from "lucide-react"
 import { cn } from "@/lib/utils"
+import type { LevelHistory } from "@/types/student"
 
-type LevelHistory = {
-  level: string
-  acquired_at: string | null
+type Props = {
+  className?: string
+  histories: LevelHistory[]
+  onEdit: () => void
 }
 
-export default function LevelSection({ className }: { className?: string }) {
-  // ===== 더미 데이터 =====
-  const histories: LevelHistory[] = [
-    { level: "WHITE", acquired_at: "2024-01-10" },
-    { level: "YELLOW", acquired_at: "2024-03-02" },
-    { level: "GREEN", acquired_at: "2024-06-18" },
-    { level: "BLUE", acquired_at: null },
-    { level: "RED", acquired_at: null },
-    { level: "BLACK", acquired_at: null },
-    { level: "GOLD", acquired_at: null },
-  ]
-
+export default function LevelSection({ className, histories, onEdit }: Props) {
   return (
     <Card className={cn(className)}>
-      <CardHeader className="p-4">
+      <CardHeader className="p-4 flex flex-row items-center justify-between">
         <CardTitle className="text-sm font-medium">레벨 이력</CardTitle>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit}>
+          <Pencil className="h-4 w-4" />
+        </Button>
       </CardHeader>
 
       <CardContent className="pt-0">
@@ -41,7 +37,10 @@ export default function LevelSection({ className }: { className?: string }) {
                 <span className="text-xs font-medium w-12">{level}</span>
 
                 {/* 획득 날짜 */}
-                <span className="text-xs text-gray-500">
+                <span className={cn(
+                  "text-xs",
+                  item?.acquired_at ? "text-foreground" : "text-gray-400"
+                )}>
                   {item?.acquired_at || "미취득"}
                 </span>
 

@@ -52,3 +52,21 @@ export type Student = {
   memo: string
   schedules: StudentSchedule[]
 }
+
+export type Payment = {
+  id: number
+  student_id: number
+  payment_date: string
+  target_month: string
+  amount: number
+  method: PaymentMethod
+  discounts: Discount[]
+  memo: string
+}
+
+export type LevelType = 'WHITE' | 'YELLOW' | 'GREEN' | 'BLUE' | 'RED' | 'BLACK' | 'GOLD'
+
+export type LevelHistory = {
+  level: LevelType
+  acquired_at: string | null
+}
