@@ -75,6 +75,26 @@ npm run dev
 - 할인 동적 추가/삭제
 - 최종 금액 실시간 계산
 
+#### 결제 수정
+- 결제 내역 테이블에서 더보기(⋯) 버튼 → "수정" 클릭
+- 기존 결제 데이터 로드
+- 할인 추가/삭제 가능
+
+#### 결제 삭제
+- 결제 내역 테이블에서 더보기(⋯) 버튼 → "삭제" 클릭
+- 삭제 확인 다이얼로그 표시
+- 확인 시 삭제 실행
+
+### 레벨 관리
+
+#### 레벨 이력 수정
+- 레벨 섹션 상단 연필 아이콘 클릭
+- 각 레벨별 취득일 입력/수정
+- X 버튼으로 취득일 초기화 (미취득 처리)
+
+**레벨 종류:**
+- WHITE → YELLOW → GREEN → BLUE → RED → BLACK → GOLD
+
 ---
 
 ## 타입 정의
@@ -86,6 +106,7 @@ type StudentStatus = '재원' | '휴원' | '퇴원' | '체험'
 type GroupType = '일반1' | '일반2' | '스페셜' | '체험'
 type Gender = '남' | '여'
 type PaymentMethod = '계좌이체' | '카드결제' | '스포츠바우처' | '현금'
+type LevelType = 'WHITE' | 'YELLOW' | 'GREEN' | 'BLUE' | 'RED' | 'BLACK' | 'GOLD'
 
 type StudentSchedule = {
   weekday: number      // 0-6 (일-토)
@@ -117,13 +138,20 @@ type Discount = {
   amount: number
 }
 
-type PaymentFormData = {
+type Payment = {
+  id: number
+  student_id: number
   payment_date: string
   target_month: string
-  amount: string
+  amount: number
   method: PaymentMethod
   discounts: Discount[]
   memo: string
+}
+
+type LevelHistory = {
+  level: LevelType
+  acquired_at: string | null
 }
 ```
 
@@ -143,6 +171,8 @@ app/
 │           ├── index.tsx               # 학생 상세 모달
 │           ├── edit-student-modal.tsx  # 학생 수정 모달
 │           ├── add-payment-modal.tsx   # 결제 추가 모달
+│           ├── edit-payment-modal.tsx  # 결제 수정 모달
+│           ├── edit-level-modal.tsx    # 레벨 이력 수정 모달
 │           └── sections/
 │               ├── profile.tsx         # 기본 정보 섹션
 │               ├── level.tsx           # 레벨 섹션
@@ -150,7 +180,10 @@ app/
 │               └── payments.tsx        # 결제 내역 섹션
 
 components/
-└── ui/                                 # shadcn/ui 컴포넌트
+├── ui/                                 # shadcn/ui 컴포넌트
+│   ├── confirm-dialog.tsx              # 삭제 확인 다이얼로그
+│   └── ...
+└── level-badge.tsx                     # 레벨 색상 배지
 
 types/
 └── student.ts                          # 학생 관련 타입 정의
@@ -164,5 +197,4 @@ types/
 - [ ] 학생 데이터 CRUD API
 - [ ] 결제 데이터 CRUD API
 - [ ] 출석 관리 기능
-- [ ] 레벨 이력 관리 기능
 - [ ] 대시보드 통계
