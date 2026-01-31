@@ -11,26 +11,26 @@ import StatusBadge from "@/components/status-badge"
 import type { StudentStatus } from "@/types/student"
 
 const columns = [
-  { key: "name", label: "이름" },
-  { key: "gender", label: "성별" },
-  { key: "grade", label: "학년" },
-  { key: "level", label: "레벨" },
-  { key: "className", label: "등록반" },
-  { key: "classTime", label: "수업 시간" },
-  { key: "phone", label: "전화번호" },
-  { key: "lastPayment", label: "최근 결제" },
-  { key: "paymentAmount", label: "결제금액" },
-  { key: "status", label: "상태" },
+  { key: "name", label: "이름", className: "w-20" },
+  { key: "gender", label: "성별", className: "w-14" },
+  { key: "grade", label: "학년", className: "w-14" },
+  { key: "level", label: "레벨", className: "w-16" },
+  { key: "className", label: "등록반", className: "" },
+  { key: "classTime", label: "수업 시간", className: "" },
+  { key: "phone", label: "전화번호", className: "w-32 whitespace-nowrap" },
+  { key: "lastPayment", label: "최근 결제", className: "" },
+  { key: "paymentAmount", label: "결제금액", className: "" },
+  { key: "status", label: "상태", className: "w-16" },
 ]
 
 function StudentsTable({ students, onRowClick }: { students: any[], onRowClick: (id: number) => void }) {
   return (
     <div className="w-full overflow-x-auto">
-      <Table className="w-full min-w-full table-fixed">
+      <Table className="w-full min-w-full">
         <TableHeader>
           <TableRow>
             {columns.map((col) => (
-              <TableHead key={col.key}>{col.label}</TableHead>
+              <TableHead key={col.key} className={col.className}>{col.label}</TableHead>
             ))}
           </TableRow>
         </TableHeader>
@@ -43,7 +43,10 @@ function StudentsTable({ students, onRowClick }: { students: any[], onRowClick: 
               onClick={() => onRowClick(s.id)}
             >
               {columns.map((col) => (
-                <TableCell key={col.key}>
+                <TableCell
+                  key={col.key}
+                  className={col.key === "phone" ? "whitespace-nowrap" : col.key === "name" ? "font-medium" : ""}
+                >
                   {col.key === "status" && s.status ? (
                     <StatusBadge status={s.status as StudentStatus} />
                   ) : (
