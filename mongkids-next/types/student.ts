@@ -70,3 +70,46 @@ export type LevelHistory = {
   level: LevelType
   acquired_at: string | null
 }
+
+// 수업 관리 타입
+export type AttendanceStatus = '예정' | '출석' | '결석'
+export type AttendanceKind = '정규' | '보강'
+
+export type ClassItem = {
+  class_id: number
+  date: string
+  time: string
+  group_type: GroupType
+  students: ClassStudent[]
+}
+
+export type ClassStudent = {
+  id: number
+  name: string
+  grade: string
+  level: LevelType | ''
+  isTrial?: boolean
+}
+
+export type AttendanceRecord = {
+  id: number
+  student_id: number
+  class_id: number
+  date: string
+  status: AttendanceStatus
+  kind: AttendanceKind
+  makeup_of_attendance_id: number | null
+  note: string | null
+}
+
+export type DisplayStatus =
+  | 'REGULAR_PLANNED'
+  | 'REGULAR_PRESENT'
+  | 'REGULAR_ABSENT'
+  | 'REGULAR_MAKEUP_PLANNED'
+  | 'REGULAR_MAKEUP_PRESENT'
+  | 'REGULAR_MAKEUP_ABSENT'
+  | 'MAKEUP_PLANNED'
+  | 'MAKEUP_PRESENT'
+  | 'MAKEUP_ABSENT'
+  | 'NONE'

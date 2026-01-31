@@ -6,7 +6,7 @@ export default function DashBoardLayout({ children }: { children: React.ReactNod
   return (
     <SidebarProvider>
       <AppSidebar />
-      <main>
+      <main className="flex-1 min-w-0">
         <SidebarTrigger />
         <DashboardHeader />
         {children}
