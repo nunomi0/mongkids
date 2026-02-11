@@ -133,6 +133,9 @@ export default function DailyPage() {
   // 수업 추가 모달
   const [addTargetClass, setAddTargetClass] = useState<ClassItem | null>(null)
 
+  // 수업 메모 (key: `${classId}-${studentId}`)
+  const [memoMap, setMemoMap] = useState<Record<string, string>>({})
+
   const selectedStudent = useMemo(() => {
     if (selectedStudentId === null) return null
     const s = STUDENT_POOL.find((p) => p.id === selectedStudentId)
@@ -219,6 +222,12 @@ export default function DailyPage() {
       return next
     })
   }, [selectedDate, classes])
+
+  // 수업 메모 변경
+  const handleMemoChange = useCallback((classId: number, studentId: number, value: string) => {
+    const key = `${classId}-${studentId}`
+    setMemoMap((prev) => ({ ...prev, [key]: value }))
+  }, [])
 
   // 시간대별 그룹
   const groupedByTime = useMemo(() => {
@@ -308,10 +317,12 @@ export default function DailyPage() {
                 time={time}
                 classes={items}
                 attendanceMap={attendanceMap}
+                memoMap={memoMap}
                 onToggleAttendance={toggleAttendance}
                 onStudentClick={handleStudentClick}
                 onAddClick={handleAddClick}
                 onMarkAllPresent={markAllPresent}
+                onMemoChange={handleMemoChange}
               />
             ))}
           </div>

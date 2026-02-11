@@ -280,6 +280,7 @@ export default function WeeklyPage() {
   const [attendanceMap, setAttendanceMap] = useState<Record<string, AttendanceRecord>>({})
   const [addTargetClass, setAddTargetClass] = useState<ClassItem | null>(null)
   const [addClassTarget, setAddClassTarget] = useState<{ date: string; time: string } | null>(null)
+  const [memoMap, setMemoMap] = useState<Record<string, string>>({})
 
   // 날짜+시간별 인덱싱
   const classesByDateTime = useMemo(() => {
@@ -371,6 +372,41 @@ export default function WeeklyPage() {
     },
     [addTargetClass],
   )
+
+  const handleMarkAllPresent = useCallback((classId: number) => {
+    if (!modalClass) return
+    setAttendanceMap((prev) => {
+      const next = { ...prev }
+      for (const st of modalClass.students) {
+        const detailKey = `${modalClass.date}-${classId}-${st.id}`
+        const simpleKey = `${classId}-${st.id}`
+        const existing = next[detailKey] || next[simpleKey]
+        if (existing) {
+          next[detailKey] = { ...existing, status: "출석", date: modalClass.date }
+          next[simpleKey] = { ...existing, status: "출석", date: modalClass.date }
+        } else {
+          const record: AttendanceRecord = {
+            id: Date.now() + st.id,
+            student_id: st.id,
+            class_id: classId,
+            date: modalClass.date,
+            status: "출석",
+            kind: "정규",
+            makeup_of_attendance_id: null,
+            note: null,
+          }
+          next[detailKey] = record
+          next[simpleKey] = record
+        }
+      }
+      return next
+    })
+  }, [modalClass])
+
+  const handleMemoChange = useCallback((classId: number, studentId: number, value: string) => {
+    const key = `${classId}-${studentId}`
+    setMemoMap((prev) => ({ ...prev, [key]: value }))
+  }, [])
 
   const handleAddClassClick = useCallback((date: string, time: string) => {
     setAddClassTarget({ date, time })
@@ -475,8 +511,11 @@ export default function WeeklyPage() {
             <ClassDetailCard
               classItem={modalClass}
               attendanceMap={modalAttendanceMap}
+              memoMap={memoMap}
               onToggleAttendance={handleToggleAttendance}
               onAddClick={handleAddClick}
+              onMarkAllPresent={handleMarkAllPresent}
+              onMemoChange={handleMemoChange}
             />
           )}
         </DialogContent>
