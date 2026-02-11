@@ -18,12 +18,21 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select"
-import { ArrowLeft, Search, UserPlus, RotateCcw, Clock, Calendar } from "lucide-react"
+import { ArrowLeft, Search, UserPlus, RotateCcw, Clock } from "lucide-react"
 import LevelBadge from "@/components/level-badge"
 import StatusBadge from "@/components/status-badge"
-import type { ClassItem, ClassStudent, AttendanceKind, LevelType, Gender, GroupType, StudentSchedule, StudentStatus } from "@/types/student"
+import type { ClassItem, ClassStudent, AttendanceKind, AttendanceStatus, LevelType, Gender, GroupType, StudentSchedule, StudentStatus } from "@/types/student"
 
 const WEEKDAY_KR = ["일", "월", "화", "수", "목", "금", "토"]
+
+// 이번 달 출석 기록 타입
+type MonthlyAttendanceItem = {
+  id: number
+  date: string
+  time: string
+  group_type: GroupType
+  status: AttendanceStatus
+}
 
 // 검색용 확장 학생 타입
 type SearchableStudent = ClassStudent & {
@@ -86,11 +95,63 @@ const STUDENT_SCHEDULES: Record<number, StudentSchedule[]> = {
   ],
 }
 
+// 시드 기반 난수 (학생 ID + 날짜 기반으로 일관된 결과)
+function seededRand(seed: number): number {
+  const s = (seed * 1103515245 + 12345) & 0x7fffffff
+  return s / 0x7fffffff
+}
+
+// 학생의 이번 달 출석 기록 생성
+function generateMonthlyAttendance(studentId: number): MonthlyAttendanceItem[] {
+  const schedules = STUDENT_SCHEDULES[studentId]
+  if (!schedules || schedules.length === 0) return []
+
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  const today = now.getDate()
+  const items: MonthlyAttendanceItem[] = []
+  let attId = studentId * 10000
+
+  // 이번 달 1일부터 말일까지
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const d = new Date(year, month, day)
+    const weekday = d.getDay()
+
+    for (const schedule of schedules) {
+      if (schedule.weekday !== weekday) continue
+
+      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+      let status: AttendanceStatus
+
+      if (day > today) {
+        status = "예정"
+      } else {
+        // 시드 기반으로 출석/결석 결정 (약 20%가 결석)
+        const r = seededRand(studentId * 100 + day * 7 + schedule.weekday)
+        status = r < 0.2 ? "결석" : "출석"
+      }
+
+      items.push({
+        id: attId++,
+        date: dateStr,
+        time: schedule.time,
+        group_type: schedule.group_type,
+        status,
+      })
+    }
+  }
+
+  return items
+}
+
 type Props = {
   isOpen: boolean
   onClose: () => void
   classItem: ClassItem
-  onAddStudent: (student: ClassStudent, kind: AttendanceKind, sourceSchedule?: StudentSchedule) => void
+  onAddStudent: (student: ClassStudent, kind: AttendanceKind, makeupOfAttendanceId?: number) => void
   classGroupType?: GroupType
 }
 
@@ -168,8 +229,8 @@ export default function AddClassStudentModal({ isOpen, onClose, classItem, onAdd
     handleClose()
   }
 
-  // 보강 시 원래 수업 선택
-  const handleSelectSourceClass = (schedule: StudentSchedule) => {
+  // 보강 시 원래 출석 기록 선택
+  const handleSelectSourceAttendance = (attendance: MonthlyAttendanceItem) => {
     if (!selectedStudent) return
     const classStudent: ClassStudent = {
       id: selectedStudent.id,
@@ -177,14 +238,14 @@ export default function AddClassStudentModal({ isOpen, onClose, classItem, onAdd
       grade: selectedStudent.grade,
       level: selectedStudent.level,
     }
-    onAddStudent(classStudent, "보강", schedule)
+    onAddStudent(classStudent, "보강", attendance.id)
     handleClose()
   }
 
-  // 선택한 학생의 정규 수업 스케줄
-  const studentSchedules = useMemo(() => {
+  // 선택한 학생의 이번 달 출석 기록
+  const monthlyAttendance = useMemo(() => {
     if (!selectedStudent) return []
-    return STUDENT_SCHEDULES[selectedStudent.id] ?? []
+    return generateMonthlyAttendance(selectedStudent.id)
   }, [selectedStudent])
 
   // 체험 학생 등록
@@ -272,14 +333,7 @@ export default function AddClassStudentModal({ isOpen, onClose, classItem, onAdd
                         onClick={() => handleSelectStudent(student)}
                       >
                         <td className="py-2 px-2">
-                          <div className="flex items-center gap-1.5">
-                            {student.level ? (
-                              <LevelBadge level={student.level as LevelType} size={10} radius={2} />
-                            ) : (
-                              <span className="w-[10px] h-[10px] rounded-sm bg-gray-200 inline-block" />
-                            )}
-                            <span className="font-medium text-sm">{student.name}</span>
-                          </div>
+                          <span className="font-medium text-sm">{student.name}</span>
                         </td>
                         <td className="py-2 px-1">{student.gender}</td>
                         <td className="py-2 px-1">{student.grade}</td>
@@ -335,7 +389,7 @@ export default function AddClassStudentModal({ isOpen, onClose, classItem, onAdd
           </div>
         )}
 
-        {/* Step 3: 보강 시 원래 수업 선택 */}
+        {/* Step 3: 보강 시 이번 달 출석 현황에서 선택 */}
         {step === "select-class" && selectedStudent && (
           <div className="space-y-3 py-2">
             <div className="flex items-center gap-2 px-3 py-2 rounded bg-muted/50">
@@ -347,35 +401,56 @@ export default function AddClassStudentModal({ isOpen, onClose, classItem, onAdd
               <span className="text-sm font-medium">{selectedStudent.name}</span>
               <span className="text-xs text-muted-foreground">{selectedStudent.grade}</span>
             </div>
-            <p className="text-sm text-muted-foreground">어떤 수업의 보강인가요?</p>
-            {studentSchedules.length === 0 ? (
+            <p className="text-sm text-muted-foreground">어떤 수업의 보강인가요? (이번 달 출석 현황)</p>
+            {monthlyAttendance.length === 0 ? (
               <div className="text-sm text-muted-foreground text-center py-6">
-                등록된 정규 수업이 없습니다
+                이번 달 출석 기록이 없습니다
               </div>
             ) : (
-              <div className="space-y-1.5">
-                {studentSchedules.map((schedule, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-3 px-3 py-3 rounded border border-transparent cursor-pointer transition-colors hover:bg-muted/50 hover:border-border"
-                    onClick={() => handleSelectSourceClass(schedule)}
-                  >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-muted text-xs font-semibold">
-                      {WEEKDAY_KR[schedule.weekday]}
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-sm font-medium">{schedule.time}</span>
-                        <span className="text-xs text-muted-foreground">·</span>
-                        <span className="text-sm">{schedule.group_type}</span>
+              <div className="max-h-[320px] overflow-y-auto space-y-1">
+                {monthlyAttendance.map((att) => {
+                  const d = new Date(att.date)
+                  const dayLabel = `${d.getMonth() + 1}/${d.getDate()}`
+                  const weekdayLabel = WEEKDAY_KR[d.getDay()]
+                  const isAbsent = att.status === "결석"
+                  const isPresent = att.status === "출석"
+                  const isPending = att.status === "예정"
+
+                  return (
+                    <div
+                      key={att.id}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded border transition-colors ${
+                        isAbsent
+                          ? "border-red-200 bg-red-50/50 cursor-pointer hover:bg-red-50 hover:border-red-300"
+                          : isPresent
+                          ? "border-gray-100 bg-gray-50/50 opacity-50 cursor-not-allowed"
+                          : "border-gray-200 bg-white opacity-60 cursor-not-allowed"
+                      }`}
+                      onClick={isAbsent ? () => handleSelectSourceAttendance(att) : undefined}
+                    >
+                      <div className={`flex items-center justify-center w-12 h-8 rounded-md text-xs font-semibold ${
+                        isAbsent ? "bg-red-100 text-red-700" : "bg-muted text-muted-foreground"
+                      }`}>
+                        {dayLabel}({weekdayLabel})
                       </div>
-                      <span className="text-xs text-muted-foreground">
-                        매주 {WEEKDAY_KR[schedule.weekday]}요일
+                      <div className="flex items-center gap-1.5 flex-1">
+                        <Clock className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-sm">{att.time}</span>
+                        <span className="text-xs text-muted-foreground">·</span>
+                        <span className="text-sm">{att.group_type}</span>
+                      </div>
+                      <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                        isAbsent
+                          ? "bg-red-100 text-red-700"
+                          : isPresent
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-100 text-gray-500"
+                      }`}>
+                        {att.status}
                       </span>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
