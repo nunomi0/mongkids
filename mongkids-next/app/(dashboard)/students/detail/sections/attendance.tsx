@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useCallback } from "react"
 import {
   Table,
   TableBody,
@@ -9,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 
 import {
   Select,
@@ -19,48 +20,64 @@ import {
   SelectItem,
 } from "@/components/ui/select"
 
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu"
+import { MessageSquare } from "lucide-react"
 
-import { MoreHorizontal } from "lucide-react"
+type AttendanceItem = {
+  id: number
+  date: string
+  time: string
+  type: string
+  status: string
+  note: string
+}
 
 export default function AttendanceSection() {
   const months = ["2024-12", "2024-11", "2024-10"]
 
-  const STATUS_OPTIONS = ["예정", "출석", "결석", "보강"]
+  const STATUS_OPTIONS = ["예정", "출석", "결석"]
 
-  const attendance = [
+  const [attendance, setAttendance] = useState<AttendanceItem[]>([
     { id: 1, date: "2024-12-01", time: "17:00", type: "정규", status: "출석", note: "" },
     { id: 2, date: "2024-12-03", time: "17:00", type: "정규", status: "결석", note: "" },
     { id: 3, date: "2024-12-05", time: "16:00", type: "보강", status: "출석", note: "지각" },
-  ]
+  ])
+
+  // 인라인 메모 확장 상태 (열면 닫히지 않음)
+  const [expandedMemos, setExpandedMemos] = useState<Set<number>>(new Set())
+
+  const openMemo = useCallback((id: number) => {
+    setExpandedMemos((prev) => {
+      if (prev.has(id)) return prev
+      const next = new Set(prev)
+      next.add(id)
+      return next
+    })
+  }, [])
 
   const changeStatus = (id: number, next: string) => {
-    console.log("상태 변경:", { id, next })
+    setAttendance((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, status: next } : item))
+    )
   }
+
+  const changeNote = useCallback((id: number, value: string) => {
+    setAttendance((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, note: value } : item))
+    )
+  }, [])
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>출석 현황</CardTitle>
 
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            정규 수업 추가
-          </Button>
-
-          <select className="border rounded px-2 py-1 text-sm">
-            {months.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </div>
+        <select className="border rounded px-2 py-1 text-sm">
+          {months.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
       </CardHeader>
 
       <CardContent>
@@ -72,7 +89,7 @@ export default function AttendanceSection() {
               <TableHead>시간</TableHead>
               <TableHead>구분</TableHead>
               <TableHead>상태</TableHead>
-              <TableHead>메모</TableHead>
+              <TableHead className="w-[40px]">메모</TableHead>
             </TableRow>
           </TableHeader>
 
@@ -80,45 +97,65 @@ export default function AttendanceSection() {
             {attendance.map((item) => {
               const dateObj = new Date(item.date)
               const weekday = dateObj.toLocaleDateString("ko-KR", { weekday: "short" })
+              const hasMemo = !!item.note.trim()
+              const isExpanded = expandedMemos.has(item.id)
 
               return (
-                <TableRow key={item.id}>
-                  <TableCell>{item.date}</TableCell>
-                  <TableCell>{weekday}</TableCell>
-                  <TableCell>{item.time}</TableCell>
-                  <TableCell>{item.type}</TableCell>
-                  <TableCell>
-                    <Select
-                      defaultValue={item.status}
-                      onValueChange={(v) => changeStatus(item.id, v)}
-                    >
-                      <SelectTrigger className="w-[90px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STATUS_OPTIONS.map((s) => (
-                          <SelectItem key={s} value={s}>
-                            {s}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell className="flex items-center justify-between">
-                    {item.note || "-"}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0 ml-2">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>보강 편성</DropdownMenuItem>
-                        <DropdownMenuItem>메모 수정</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
+                <>
+                  <TableRow key={item.id}>
+                    <TableCell>{item.date}</TableCell>
+                    <TableCell>{weekday}</TableCell>
+                    <TableCell>{item.time}</TableCell>
+                    <TableCell>{item.type}</TableCell>
+                    <TableCell>
+                      <Select
+                        value={item.status}
+                        onValueChange={(v) => changeStatus(item.id, v)}
+                      >
+                        <SelectTrigger className="w-[90px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STATUS_OPTIONS.map((s) => (
+                            <SelectItem key={s} value={s}>
+                              {s}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <button
+                        type="button"
+                        className={`relative p-1 rounded transition-colors ${
+                          hasMemo
+                            ? "text-blue-500 hover:bg-blue-50"
+                            : "text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50"
+                        }`}
+                        onClick={() => openMemo(item.id)}
+                        title="수업 메모"
+                      >
+                        <MessageSquare className="h-3.5 w-3.5" />
+                        {hasMemo && (
+                          <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                        )}
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                  {isExpanded && (
+                    <TableRow key={`memo-${item.id}`}>
+                      <TableCell colSpan={6} className="py-2 px-4 bg-muted/20">
+                        <Textarea
+                          value={item.note}
+                          onChange={(e) => changeNote(item.id, e.target.value)}
+                          placeholder="수업 메모를 입력하세요..."
+                          className="min-h-[60px] text-xs resize-none bg-white"
+                          rows={2}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
               )
             })}
 
