@@ -8,9 +8,11 @@ type Props = {
   attendanceMap: Record<string, AttendanceRecord>
   onToggleAttendance: (studentId: number, classId: number) => void
   onStudentClick?: (studentId: number) => void
+  onAddClick?: (classItem: ClassItem) => void
+  onMarkAllPresent?: (classId: number) => void
 }
 
-function TimeSlotSection({ time, classes, attendanceMap, onToggleAttendance, onStudentClick }: Props) {
+function TimeSlotSection({ time, classes, attendanceMap, onToggleAttendance, onStudentClick, onAddClick, onMarkAllPresent }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -26,6 +28,8 @@ function TimeSlotSection({ time, classes, attendanceMap, onToggleAttendance, onS
             attendanceMap={attendanceMap}
             onToggleAttendance={onToggleAttendance}
             onStudentClick={onStudentClick}
+            onAddClick={onAddClick ? () => onAddClick(cls) : undefined}
+            onMarkAllPresent={onMarkAllPresent}
           />
         ))}
       </div>

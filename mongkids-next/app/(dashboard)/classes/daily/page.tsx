@@ -6,11 +6,13 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ChevronLeft, ChevronRight, CalendarDays, Users, Check, X } from "lucide-react"
 import TimeSlotSection from "../time-slot-section"
 import StudentDetailModal from "../../students/detail/index"
+import AddClassStudentModal from "../add-class-student-modal"
 import type {
   ClassItem,
   ClassStudent,
   AttendanceRecord,
   AttendanceStatus,
+  AttendanceKind,
   GroupType,
   StudentStatus,
 } from "@/types/student"
@@ -128,6 +130,9 @@ export default function DailyPage() {
   // 학생 상세 모달
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null)
 
+  // 수업 추가 모달
+  const [addTargetClass, setAddTargetClass] = useState<ClassItem | null>(null)
+
   const selectedStudent = useMemo(() => {
     if (selectedStudentId === null) return null
     const s = STUDENT_POOL.find((p) => p.id === selectedStudentId)
@@ -142,6 +147,19 @@ export default function DailyPage() {
   const handleStudentClick = useCallback((id: number) => setSelectedStudentId(id), [])
   const handleDetailClose = useCallback(() => setSelectedStudentId(null), [])
   const handleStatusChange = useCallback(() => {}, [])
+
+  const handleAddClick = useCallback((classItem: ClassItem) => {
+    setAddTargetClass(classItem)
+  }, [])
+
+  const handleAddStudent = useCallback(
+    (student: ClassStudent, kind: AttendanceKind) => {
+      if (!addTargetClass) return
+      // 실제로는 API 호출. 여기서는 더미로 처리
+      setAddTargetClass(null)
+    },
+    [addTargetClass],
+  )
 
   // 날짜 이동
   const updateDate = useCallback((d: Date) => {
@@ -172,6 +190,35 @@ export default function DailyPage() {
       return { ...prev, [key]: { ...record, status: next } }
     })
   }, [selectedDate])
+
+  // 전체 출석
+  const markAllPresent = useCallback((classId: number) => {
+    const dateStr = toDateStr(selectedDate)
+    setAttendanceMap((prev) => {
+      const next = { ...prev }
+      const cls = classes.find((c) => c.class_id === classId)
+      if (!cls) return prev
+      for (const st of cls.students) {
+        const key = `${dateStr}-${classId}-${st.id}`
+        const record = next[key]
+        if (record) {
+          next[key] = { ...record, status: "출석" }
+        } else {
+          next[key] = {
+            id: Date.now() + st.id,
+            student_id: st.id,
+            class_id: classId,
+            date: dateStr,
+            status: "출석",
+            kind: "정규",
+            makeup_of_attendance_id: null,
+            note: null,
+          }
+        }
+      }
+      return next
+    })
+  }, [selectedDate, classes])
 
   // 시간대별 그룹
   const groupedByTime = useMemo(() => {
@@ -263,6 +310,8 @@ export default function DailyPage() {
                 attendanceMap={attendanceMap}
                 onToggleAttendance={toggleAttendance}
                 onStudentClick={handleStudentClick}
+                onAddClick={handleAddClick}
+                onMarkAllPresent={markAllPresent}
               />
             ))}
           </div>
@@ -277,6 +326,16 @@ export default function DailyPage() {
         student={selectedStudent}
         onStatusChange={handleStatusChange}
       />
+
+      {/* 수업 추가 모달 */}
+      {addTargetClass && (
+        <AddClassStudentModal
+          isOpen={addTargetClass !== null}
+          onClose={() => setAddTargetClass(null)}
+          classItem={addTargetClass}
+          onAddStudent={handleAddStudent}
+        />
+      )}
     </>
   )
 }

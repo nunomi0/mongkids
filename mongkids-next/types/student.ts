@@ -102,6 +102,22 @@ export type AttendanceRecord = {
   note: string | null
 }
 
+// 체험 관리 타입
+export type TrialStatus = '예정' | '노쇼' | '미등록' | '등록'
+
+export type TrialReservation = {
+  id: number
+  name: string
+  phone: string
+  gender: Gender | ''
+  grade: string
+  status: TrialStatus
+  trial_date: string
+  trial_time: string
+  note: string
+  created_at: string
+}
+
 export type DisplayStatus =
   | 'REGULAR_PLANNED'
   | 'REGULAR_PRESENT'

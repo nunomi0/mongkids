@@ -370,7 +370,7 @@ export default function EditStudentModal({
             ) : (
               <div className="space-y-2">
                 {schedules.map((schedule, index) => (
-                  <div key={index} className="flex items-center gap-2">
+                  <div key={index} className="flex items-center gap-2 w-full">
                     {/* 요일 */}
                     <Select
                       value={schedule.weekday.toString()}
@@ -378,7 +378,7 @@ export default function EditStudentModal({
                         updateSchedule(index, "weekday", parseInt(v))
                       }
                     >
-                      <SelectTrigger className="w-20">
+                      <SelectTrigger className="flex-1 min-w-0">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -395,7 +395,7 @@ export default function EditStudentModal({
                       value={schedule.time}
                       onValueChange={(v) => updateSchedule(index, "time", v)}
                     >
-                      <SelectTrigger className="w-24">
+                      <SelectTrigger className="flex-1 min-w-0">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -414,7 +414,7 @@ export default function EditStudentModal({
                         updateSchedule(index, "group_type", v)
                       }
                     >
-                      <SelectTrigger className="w-24">
+                      <SelectTrigger className="flex-1 min-w-0">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -431,6 +431,7 @@ export default function EditStudentModal({
                       type="button"
                       variant="ghost"
                       size="icon"
+                      className="shrink-0"
                       onClick={() => removeSchedule(index)}
                     >
                       <Trash2 className="h-4 w-4 text-muted-foreground" />

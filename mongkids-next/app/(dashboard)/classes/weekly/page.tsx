@@ -1,13 +1,15 @@
 "use client"
 
-import { useState, useCallback, useMemo, memo } from "react"
+import { useState, useCallback, useMemo, useEffect, memo } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react"
+import { ChevronLeft, ChevronRight, CalendarDays, Plus } from "lucide-react"
 import LevelBadge from "@/components/level-badge"
 import ClassDetailCard from "../class-detail-card"
+import AddClassStudentModal from "../add-class-student-modal"
+import AddClassModal from "../add-class-modal"
 import type {
   ClassItem,
   ClassStudent,
@@ -15,6 +17,7 @@ import type {
   LevelType,
   AttendanceRecord,
   AttendanceStatus,
+  AttendanceKind,
 } from "@/types/student"
 
 // ── 유틸 ──
@@ -190,11 +193,13 @@ const TimeSlotRow = memo(function TimeSlotRow({
   weekDates,
   classesByDateTime,
   onClassClick,
+  onAddClassClick,
 }: {
   time: string
   weekDates: Date[]
   classesByDateTime: Map<string, ClassItem[]>
   onClassClick: (cls: ClassItem) => void
+  onAddClassClick: (date: string, time: string) => void
 }) {
   const todayStr = toDateStr(new Date())
 
@@ -213,7 +218,7 @@ const TimeSlotRow = memo(function TimeSlotRow({
         return (
           <td
             key={ds}
-            className={`border-r border-b p-1.5 align-top text-xs ${
+            className={`group/cell border-r border-b p-1.5 align-top text-xs ${
               isToday ? "bg-blue-50/50" : isSunday ? "bg-muted/30" : ""
             }`}
           >
@@ -243,6 +248,14 @@ const TimeSlotRow = memo(function TimeSlotRow({
                 ))}
               </div>
             )}
+            {/* 수업 추가 버튼 — 하단 영역, hover 시 노출 */}
+            <div
+              className="mt-1.5 rounded h-6 flex items-center justify-center cursor-pointer opacity-0 group-hover/cell:opacity-100 transition-all text-muted-foreground/50 hover:!bg-blue-50 hover:!text-blue-600"
+              onClick={() => onAddClassClick(ds, time)}
+            >
+              <Plus className="h-3 w-3 mr-0.5" />
+              <span className="text-[10px]">수업 추가</span>
+            </div>
           </td>
         )
       })}
@@ -256,29 +269,35 @@ export default function WeeklyPage() {
   const [monday, setMonday] = useState<Date>(() => getMonday(new Date()))
   const sunday = useMemo(() => getSunday(monday), [monday])
   const weekDates = useMemo(() => getWeekDates(monday), [monday])
-  const classes = useMemo(() => generateWeekClasses(monday), [monday])
+  const [localClasses, setLocalClasses] = useState<ClassItem[]>(() => generateWeekClasses(monday))
+
+  useEffect(() => {
+    setLocalClasses(generateWeekClasses(monday))
+  }, [monday])
 
   const [showCalendar, setShowCalendar] = useState(false)
   const [modalClass, setModalClass] = useState<ClassItem | null>(null)
   const [attendanceMap, setAttendanceMap] = useState<Record<string, AttendanceRecord>>({})
+  const [addTargetClass, setAddTargetClass] = useState<ClassItem | null>(null)
+  const [addClassTarget, setAddClassTarget] = useState<{ date: string; time: string } | null>(null)
 
   // 날짜+시간별 인덱싱
   const classesByDateTime = useMemo(() => {
     const map = new Map<string, ClassItem[]>()
-    for (const cls of classes) {
+    for (const cls of localClasses) {
       const key = `${cls.date}-${cls.time}`
       const list = map.get(key) || []
       list.push(cls)
       map.set(key, list)
     }
     return map
-  }, [classes])
+  }, [localClasses])
 
   const uniqueTimes = useMemo(() => {
     const set = new Set<string>()
-    for (const cls of classes) set.add(cls.time)
+    for (const cls of localClasses) set.add(cls.time)
     return Array.from(set).sort()
-  }, [classes])
+  }, [localClasses])
 
   // 모달용 attendance map
   const modalAttendanceMap = useMemo(() => {
@@ -336,6 +355,31 @@ export default function WeeklyPage() {
     },
     [modalClass],
   )
+
+  const handleAddClick = useCallback(() => {
+    if (modalClass) setAddTargetClass(modalClass)
+  }, [modalClass])
+
+  const handleAddStudent = useCallback(
+    (student: ClassStudent, kind: AttendanceKind) => {
+      if (!addTargetClass) return
+      setModalClass((prev) => {
+        if (!prev || prev.class_id !== addTargetClass.class_id) return prev
+        return { ...prev, students: [...prev.students, student] }
+      })
+      setAddTargetClass(null)
+    },
+    [addTargetClass],
+  )
+
+  const handleAddClassClick = useCallback((date: string, time: string) => {
+    setAddClassTarget({ date, time })
+  }, [])
+
+  const handleAddClass = useCallback((newClass: ClassItem) => {
+    setLocalClasses((prev) => [...prev, newClass])
+    setAddClassTarget(null)
+  }, [])
 
   return (
     <>
@@ -410,6 +454,7 @@ export default function WeeklyPage() {
                     weekDates={weekDates}
                     classesByDateTime={classesByDateTime}
                     onClassClick={handleClassClick}
+                    onAddClassClick={handleAddClassClick}
                   />
                 ))}
               </tbody>
@@ -431,10 +476,37 @@ export default function WeeklyPage() {
               classItem={modalClass}
               attendanceMap={modalAttendanceMap}
               onToggleAttendance={handleToggleAttendance}
+              onAddClick={handleAddClick}
             />
           )}
         </DialogContent>
       </Dialog>
+
+      {/* 학생 추가 모달 */}
+      {addTargetClass && (
+        <AddClassStudentModal
+          isOpen={addTargetClass !== null}
+          onClose={() => setAddTargetClass(null)}
+          classItem={addTargetClass}
+          onAddStudent={handleAddStudent}
+          classGroupType={addTargetClass.group_type}
+        />
+      )}
+
+      {/* 수업 추가 모달 */}
+      {addClassTarget && (
+        <AddClassModal
+          isOpen={addClassTarget !== null}
+          onClose={() => setAddClassTarget(null)}
+          date={addClassTarget.date}
+          time={addClassTarget.time}
+          onAddClass={handleAddClass}
+          existingGroupTypes={
+            (classesByDateTime.get(`${addClassTarget.date}-${addClassTarget.time}`) || [])
+              .map((cls) => cls.group_type)
+          }
+        />
+      )}
     </>
   )
 }

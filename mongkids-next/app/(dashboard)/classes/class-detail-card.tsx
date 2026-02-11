@@ -1,6 +1,8 @@
 import { memo } from "react"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Plus, CheckCheck } from "lucide-react"
 import LevelBadge from "@/components/level-badge"
 import type {
   ClassItem,
@@ -72,9 +74,11 @@ type Props = {
   attendanceMap: Record<string, AttendanceRecord>
   onToggleAttendance: (studentId: number, classId: number) => void
   onStudentClick?: (studentId: number) => void
+  onAddClick?: () => void
+  onMarkAllPresent?: (classId: number) => void
 }
 
-function ClassDetailCard({ classItem, attendanceMap, onToggleAttendance, onStudentClick }: Props) {
+function ClassDetailCard({ classItem, attendanceMap, onToggleAttendance, onStudentClick, onAddClick, onMarkAllPresent }: Props) {
   const { class_id, date, time, group_type, students } = classItem
 
   // 출석 통계
@@ -88,7 +92,7 @@ function ClassDetailCard({ classItem, attendanceMap, onToggleAttendance, onStude
   }
 
   return (
-    <Card>
+    <Card className="group/card">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm">
@@ -98,6 +102,20 @@ function ClassDetailCard({ classItem, attendanceMap, onToggleAttendance, onStude
             <span className="text-muted-foreground">{students.length}명</span>
             {present > 0 && <span className="text-green-600">출석 {present}</span>}
             {absent > 0 && <span className="text-red-600">결석 {absent}</span>}
+            {onMarkAllPresent && students.length > 0 && present < students.length && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-green-600 hover:text-green-700 hover:bg-green-50"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onMarkAllPresent(class_id)
+                }}
+              >
+                <CheckCheck className="h-3 w-3 mr-1" />
+                전체 출석
+              </Button>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -122,6 +140,17 @@ function ClassDetailCard({ classItem, attendanceMap, onToggleAttendance, onStude
               />
             )
           })
+        )}
+        {onAddClick && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full mt-2 text-muted-foreground hover:text-foreground opacity-0 group-hover/card:opacity-100 transition-opacity"
+            onClick={onAddClick}
+          >
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            학생 추가하기
+          </Button>
         )}
       </CardContent>
     </Card>
