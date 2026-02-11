@@ -130,14 +130,11 @@ function ClassDetailCard({ classItem, attendanceMap, memoMap = {}, onToggleAtten
   // 메모 확장 상태 (로컬)
   const [expandedMemos, setExpandedMemos] = useState<Set<number>>(new Set())
 
-  const toggleMemoExpanded = useCallback((studentId: number) => {
+  const openMemo = useCallback((studentId: number) => {
     setExpandedMemos((prev) => {
+      if (prev.has(studentId)) return prev
       const next = new Set(prev)
-      if (next.has(studentId)) {
-        next.delete(studentId)
-      } else {
-        next.add(studentId)
-      }
+      next.add(studentId)
       return next
     })
   }, [])
@@ -152,12 +149,6 @@ function ClassDetailCard({ classItem, attendanceMap, memoMap = {}, onToggleAtten
     else if (record?.status === "결석") absent++
   }
 
-  // 메모 있는 학생 수
-  let memoCount = 0
-  for (const st of students) {
-    const memoKey = `${class_id}-${st.id}`
-    if (memoMap[memoKey]?.trim()) memoCount++
-  }
 
   return (
     <Card className="group/card">
@@ -170,11 +161,6 @@ function ClassDetailCard({ classItem, attendanceMap, memoMap = {}, onToggleAtten
             <span className="text-muted-foreground">{students.length}명</span>
             {present > 0 && <span className="text-green-600">출석 {present}</span>}
             {absent > 0 && <span className="text-red-600">결석 {absent}</span>}
-            {memoCount > 0 && (
-              <span className="flex items-center gap-0.5 text-blue-500">
-                <MessageSquare className="h-3 w-3" />{memoCount}
-              </span>
-            )}
             {onMarkAllPresent && students.length > 0 && present < students.length && (
               <Button
                 variant="ghost"
@@ -213,7 +199,7 @@ function ClassDetailCard({ classItem, attendanceMap, memoMap = {}, onToggleAtten
                 isExpanded={expandedMemos.has(st.id)}
                 onToggle={() => onToggleAttendance(st.id, class_id)}
                 onNameClick={onStudentClick}
-                onMemoToggle={() => toggleMemoExpanded(st.id)}
+                onMemoToggle={() => openMemo(st.id)}
                 onMemoChange={(value) => onMemoChange?.(class_id, st.id, value)}
               />
             )
