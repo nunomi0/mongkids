@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useMemo, useEffect, memo } from "react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
@@ -11,6 +10,12 @@ import LevelBadge from "@/components/level-badge"
 import ClassDetailCard from "../class-detail-card"
 import AddClassStudentModal from "../add-class-student-modal"
 import AddClassModal from "../add-class-modal"
+import {
+  fetchClassesByWeek,
+  upsertAttendance,
+  markAllPresent as markAllPresentApi,
+  updateAttendanceMemo,
+} from "@/lib/queries"
 import type {
   ClassItem,
   ClassStudent,
@@ -60,14 +65,6 @@ function getWeekDates(monday: Date): Date[] {
 
 function getWeekOfMonth(d: Date): { month: number; week: number } {
   return { month: d.getMonth() + 1, week: Math.ceil(d.getDate() / 7) }
-}
-
-function seededRandom(seed: number): () => number {
-  let s = seed
-  return () => {
-    s = (s * 1103515245 + 12345) & 0x7fffffff
-    return s / 0x7fffffff
-  }
 }
 
 // ── 미니 달력 ──
@@ -152,50 +149,6 @@ const MiniCalendar = memo(function MiniCalendar({
     </div>
   )
 })
-
-// ── 더미 데이터 ──
-
-const DUMMY_STUDENTS: ClassStudent[] = [
-  { id: "1", name: "김민준", grade: "초3", level: "GREEN" },
-  { id: "2", name: "이서윤", grade: "초4", level: "BLUE" },
-  { id: "3", name: "박지호", grade: "초2", level: "YELLOW" },
-  { id: "4", name: "최수아", grade: "초5", level: "RED" },
-  { id: "5", name: "정예준", grade: "초1", level: "WHITE" },
-  { id: "6", name: "강하늘", grade: "초3", level: "GREEN" },
-  { id: "7", name: "윤서진", grade: "초6", level: "BLACK" },
-  { id: "8", name: "임도윤", grade: "성인", level: "GOLD" },
-]
-
-const ALL_GROUP_TYPES: GroupType[] = ["일반1", "일반2", "스페셜", "체험"]
-
-function generateWeekClasses(monday: Date): ClassItem[] {
-  const dates = getWeekDates(monday)
-  const timeSlots = ["15:00", "16:00", "17:00"]
-  const weekSeed = monday.getFullYear() * 100 + Math.floor((monday.getTime() / 604800000) % 100)
-  let classId = weekSeed * 10
-  const classes: ClassItem[] = []
-
-  for (const date of dates) {
-    const dateStr = toDateStr(date)
-    for (const time of timeSlots) {
-      const slotSeed = (weekSeed * 7 + date.getDay()) * 3 + timeSlots.indexOf(time)
-      const rand = seededRandom(slotSeed)
-      const numGroups = 1 + Math.floor(rand() * 4)
-
-      for (let g = 0; g < numGroups; g++) {
-        const group = ALL_GROUP_TYPES[g]
-        const studentSeed = classId + weekSeed
-        const start = (studentSeed * 3) % DUMMY_STUDENTS.length
-        const count = 2 + (studentSeed % 3)
-        const assigned = Array.from({ length: count }, (_, i) =>
-          DUMMY_STUDENTS[(start + i) % DUMMY_STUDENTS.length],
-        )
-        classes.push({ id: String(classId++), date: dateStr, time, group_type: group, students: assigned })
-      }
-    }
-  }
-  return classes
-}
 
 // ── 시간대 행 ──
 
@@ -291,15 +244,36 @@ export default function WeeklyPage() {
   const [monday, setMonday] = useState<Date>(() => getMonday(new Date()))
   const sunday = useMemo(() => getSunday(monday), [monday])
   const weekDates = useMemo(() => getWeekDates(monday), [monday])
-  const [localClasses, setLocalClasses] = useState<ClassItem[]>(() => generateWeekClasses(monday))
+  const [localClasses, setLocalClasses] = useState<ClassItem[]>([])
+  const [attendanceMap, setAttendanceMap] = useState<Record<string, AttendanceRecord>>({})
+  const [loading, setLoading] = useState(true)
+
+  // 데이터 로드
+  const loadData = useCallback(async (mon: Date) => {
+    setLoading(true)
+    const start = toDateStr(mon)
+    const end = toDateStr(getSunday(mon))
+    const { classes, attendanceMap: fetchedMap } = await fetchClassesByWeek(start, end)
+    setLocalClasses(classes)
+    setAttendanceMap(fetchedMap)
+    // memo 초기화
+    const memos: Record<string, string> = {}
+    for (const record of Object.values(fetchedMap)) {
+      if (record.memo) {
+        const key = `${record.class_id}-${record.student_id}`
+        memos[key] = record.memo
+      }
+    }
+    setMemoMap(memos)
+    setLoading(false)
+  }, [])
 
   useEffect(() => {
-    setLocalClasses(generateWeekClasses(monday))
-  }, [monday])
+    loadData(monday)
+  }, [monday, loadData])
 
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [modalClass, setModalClass] = useState<ClassItem | null>(null)
-  const [attendanceMap, setAttendanceMap] = useState<Record<string, AttendanceRecord>>({})
   const [addTargetClass, setAddTargetClass] = useState<ClassItem | null>(null)
   const [addClassTarget, setAddClassTarget] = useState<{ date: string; time: string } | null>(null)
   const [memoMap, setMemoMap] = useState<Record<string, string>>({})
@@ -327,10 +301,9 @@ export default function WeeklyPage() {
     if (!modalClass) return {}
     const result: Record<string, AttendanceRecord> = {}
     for (const st of modalClass.students) {
-      const detailKey = `${modalClass.date}-${modalClass.id}-${st.id}`
-      const simpleKey = `${modalClass.id}-${st.id}`
-      const record = attendanceMap[detailKey] || attendanceMap[simpleKey]
-      if (record) result[detailKey] = record
+      const key = `${modalClass.date}-${modalClass.id}-${st.id}`
+      const record = attendanceMap[key]
+      if (record) result[key] = record
     }
     return result
   }, [attendanceMap, modalClass])
@@ -356,76 +329,62 @@ export default function WeeklyPage() {
     setModalClass(cls)
   }, [])
 
-  const handleToggleAttendance = useCallback(
-    (studentId: string, classId: string) => {
-      const simpleKey = `${classId}-${studentId}`
-      const cycle: AttendanceStatus[] = ["예정", "출석", "결석"]
-      setAttendanceMap((prev) => {
-        const existing = prev[simpleKey]
-        if (existing) {
-          const idx = cycle.indexOf(existing.status)
-          return { ...prev, [simpleKey]: { ...existing, status: cycle[(idx + 1) % cycle.length] } }
-        }
-        return {
-          ...prev,
-          [simpleKey]: {
-            id: String(Date.now()), student_id: studentId, class_id: classId,
-            status: "출석", makeup_of_attendance_id: null, memo: "",
-          },
-        }
-      })
-    },
-    [],
-  )
+  // 출석 토글
+  const handleToggleAttendance = useCallback((studentId: string, classId: string) => {
+    setAttendanceMap((prev) => {
+      // date가 포함된 키 찾기
+      const matchKey = Object.keys(prev).find((k) => k.endsWith(`-${classId}-${studentId}`))
+      if (matchKey) {
+        const record = prev[matchKey]
+        const cycle: AttendanceStatus[] = ["예정", "출석", "결석"]
+        const idx = cycle.indexOf(record.status)
+        const next = cycle[(idx + 1) % cycle.length]
+        upsertAttendance({ student_id: studentId, class_id: classId, status: next })
+        return { ...prev, [matchKey]: { ...record, status: next } }
+      }
+      return prev
+    })
+  }, [])
 
   const handleAddClick = useCallback(() => {
     if (modalClass) setAddTargetClass(modalClass)
   }, [modalClass])
 
-  const handleAddStudent = useCallback(
-    (student: ClassStudent, _kind: "정규" | "보강", _makeupId?: string) => {
-      if (!addTargetClass) return
-      setModalClass((prev) => {
-        if (!prev || prev.id !== addTargetClass.id) return prev
-        return { ...prev, students: [...prev.students, student] }
-      })
-      setAddTargetClass(null)
-    },
-    [addTargetClass],
-  )
+  const handleStudentAdded = useCallback(() => {
+    setAddTargetClass(null)
+    loadData(monday)
+  }, [monday, loadData])
 
+  // 전체 출석
   const handleMarkAllPresent = useCallback((classId: string) => {
     if (!modalClass) return
+
     setAttendanceMap((prev) => {
       const next = { ...prev }
       for (const st of modalClass.students) {
-        const detailKey = `${modalClass.date}-${classId}-${st.id}`
-        const simpleKey = `${classId}-${st.id}`
-        const existing = next[detailKey] || next[simpleKey]
-        if (existing) {
-          next[detailKey] = { ...existing, status: "출석" }
-          next[simpleKey] = { ...existing, status: "출석" }
-        } else {
-          const record: AttendanceRecord = {
-            id: String(Date.now()) + st.id,
-            student_id: st.id,
-            class_id: classId,
-            status: "출석",
-            makeup_of_attendance_id: null,
-            memo: "",
-          }
-          next[detailKey] = record
-          next[simpleKey] = record
+        const key = `${modalClass.date}-${classId}-${st.id}`
+        const record = next[key]
+        if (record) {
+          next[key] = { ...record, status: "출석" }
         }
       }
       return next
     })
+
+    markAllPresentApi(classId, modalClass.students.map((s) => s.id))
   }, [modalClass])
 
+  // 수업 메모 변경
   const handleMemoChange = useCallback((classId: string, studentId: string, value: string) => {
     const key = `${classId}-${studentId}`
     setMemoMap((prev) => ({ ...prev, [key]: value }))
-  }, [])
+    // attendance record 찾아서 업데이트
+    const attKey = Object.keys(attendanceMap).find((k) => k.endsWith(`-${classId}-${studentId}`))
+    const record = attKey ? attendanceMap[attKey] : null
+    if (record?.id) {
+      updateAttendanceMemo(record.id, value)
+    }
+  }, [attendanceMap])
 
   const handleAddClassClick = useCallback((date: string, time: string) => {
     setAddClassTarget({ date, time })
@@ -479,51 +438,66 @@ export default function WeeklyPage() {
         </div>
 
         {/* 테이블 */}
-        <Card className="min-w-0 overflow-hidden">
-          <CardContent className="p-0 overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr>
-                  <th className="border-r border-b border-border/50 px-3 py-2.5 text-[11px] text-muted-foreground bg-muted/40 w-16 font-medium">
-                    시간
-                  </th>
-                  {weekDates.map((date) => {
-                    const ds = toDateStr(date)
-                    const isToday = ds === toDateStr(new Date())
-                    const isSat = date.getDay() === 6
-                    const isSun = date.getDay() === 0
+        {loading ? (
+          <div className="flex items-center justify-center py-20 text-muted-foreground">
+            <p className="text-sm">불러오는 중...</p>
+          </div>
+        ) : (
+          <Card className="min-w-0 overflow-hidden">
+            <CardContent className="p-0 overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr>
+                    <th className="border-r border-b border-border/50 px-3 py-2.5 text-[11px] text-muted-foreground bg-muted/40 w-16 font-medium">
+                      시간
+                    </th>
+                    {weekDates.map((date) => {
+                      const ds = toDateStr(date)
+                      const isToday = ds === toDateStr(new Date())
+                      const isSat = date.getDay() === 6
+                      const isSun = date.getDay() === 0
 
-                    return (
-                      <th
-                        key={ds}
-                        className={`border-r border-b border-border/50 px-2 py-2.5 text-xs font-medium min-w-[140px] ${
-                          isToday ? "bg-blue-50/60" : "bg-muted/40"
-                        }`}
-                      >
-                        <div className={`${isToday ? "text-blue-600" : isSat ? "text-blue-500" : isSun ? "text-red-500" : ""}`}>
-                          <span className="text-sm">{date.getDate()}</span>
-                          <span className="text-[11px] ml-0.5">({WEEKDAY_KR[date.getDay()]})</span>
-                        </div>
-                      </th>
-                    )
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {uniqueTimes.map((time) => (
-                  <TimeSlotRow
-                    key={time}
-                    time={time}
-                    weekDates={weekDates}
-                    classesByDateTime={classesByDateTime}
-                    onClassClick={handleClassClick}
-                    onAddClassClick={handleAddClassClick}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
+                      return (
+                        <th
+                          key={ds}
+                          className={`border-r border-b border-border/50 px-2 py-2.5 text-xs font-medium min-w-[140px] ${
+                            isToday ? "bg-blue-50/60" : "bg-muted/40"
+                          }`}
+                        >
+                          <div className={`${isToday ? "text-blue-600" : isSat ? "text-blue-500" : isSun ? "text-red-500" : ""}`}>
+                            <span className="text-sm">{date.getDate()}</span>
+                            <span className="text-[11px] ml-0.5">({WEEKDAY_KR[date.getDay()]})</span>
+                          </div>
+                        </th>
+                      )
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {uniqueTimes.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="text-center text-muted-foreground py-20">
+                        <CalendarDays className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                        <p className="text-sm">이번 주에 수업이 없습니다</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    uniqueTimes.map((time) => (
+                      <TimeSlotRow
+                        key={time}
+                        time={time}
+                        weekDates={weekDates}
+                        classesByDateTime={classesByDateTime}
+                        onClassClick={handleClassClick}
+                        onAddClassClick={handleAddClassClick}
+                      />
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* ClassDetailCard 모달 */}
@@ -554,7 +528,7 @@ export default function WeeklyPage() {
           isOpen={addTargetClass !== null}
           onClose={() => setAddTargetClass(null)}
           classItem={addTargetClass}
-          onAddStudent={handleAddStudent}
+          onStudentAdded={handleStudentAdded}
           classGroupType={addTargetClass.group_type}
         />
       )}

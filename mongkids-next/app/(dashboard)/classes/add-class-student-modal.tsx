@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -21,7 +21,20 @@ import {
 import { ArrowLeft, Search, UserPlus, RotateCcw, Clock } from "lucide-react"
 import LevelBadge from "@/components/level-badge"
 import StatusBadge from "@/components/status-badge"
-import type { ClassItem, ClassStudent, AttendanceStatus, LevelType, Gender, GroupType, StudentSchedule, StudentStatus } from "@/types/student"
+import {
+  fetchSearchableStudents,
+  fetchMonthlyAttendance,
+  upsertAttendance,
+} from "@/lib/queries"
+import type {
+  ClassItem,
+  ClassStudent,
+  AttendanceStatus,
+  LevelType,
+  Gender,
+  GroupType,
+  StudentStatus,
+} from "@/types/student"
 
 const WEEKDAY_KR = ["일", "월", "화", "수", "목", "금", "토"]
 
@@ -36,116 +49,11 @@ type MonthlyAttendanceItem = {
 
 // 검색용 확장 학생 타입
 type SearchableStudent = ClassStudent & {
-  gender: Gender
+  gender: string
   className: string
   classTime: string
   phone: string
-  status: StudentStatus
-}
-
-// 검색용 더미 학생 목록
-const SEARCHABLE_STUDENTS: SearchableStudent[] = [
-  { id: "1", name: "김민준", grade: "초3", level: "GREEN", gender: "남", className: "어린이 주 3회", classTime: "월수 15:00 / 금 16:00", phone: "010-1234-5678", status: "재원" },
-  { id: "2", name: "이서윤", grade: "초4", level: "BLUE", gender: "여", className: "어린이 주 2회", classTime: "화목 16:00", phone: "010-2345-6789", status: "재원" },
-  { id: "3", name: "박지호", grade: "초2", level: "YELLOW", gender: "남", className: "어린이 주 2회", classTime: "월 15:00 / 수 16:00", phone: "010-3456-7890", status: "재원" },
-  { id: "4", name: "최수아", grade: "초5", level: "RED", gender: "여", className: "어린이 주 3회", classTime: "월수금 16:00", phone: "010-4567-8901", status: "재원" },
-  { id: "5", name: "정예준", grade: "초1", level: "WHITE", gender: "남", className: "어린이 주 2회", classTime: "화 15:00 / 목 16:00", phone: "010-5678-9012", status: "재원" },
-  { id: "6", name: "강하늘", grade: "초3", level: "GREEN", gender: "여", className: "어린이 주 3회", classTime: "월수금 17:00", phone: "010-6789-0123", status: "재원" },
-  { id: "7", name: "윤서진", grade: "초6", level: "BLACK", gender: "여", className: "어린이 주 2회", classTime: "화 17:00 / 목 16:00", phone: "010-7890-1234", status: "휴원" },
-  { id: "8", name: "임도윤", grade: "성인", level: "GOLD", gender: "남", className: "성인 주 3회", classTime: "월 19:00 / 수금 20:00", phone: "010-8901-2345", status: "재원" },
-]
-
-// 학생별 정규 수업 스케줄 (보강 시 원래 수업 선택용)
-const STUDENT_SCHEDULES: Record<string, StudentSchedule[]> = {
-  "1": [
-    { weekday: 1, time: "15:00", group_type: "일반1" },
-    { weekday: 3, time: "15:00", group_type: "일반1" },
-    { weekday: 5, time: "15:00", group_type: "일반1" },
-  ],
-  "2": [
-    { weekday: 2, time: "16:00", group_type: "일반2" },
-    { weekday: 4, time: "16:00", group_type: "일반2" },
-  ],
-  "3": [
-    { weekday: 1, time: "16:00", group_type: "일반1" },
-    { weekday: 3, time: "16:00", group_type: "일반1" },
-    { weekday: 5, time: "16:00", group_type: "일반1" },
-  ],
-  "4": [
-    { weekday: 2, time: "17:00", group_type: "스페셜" },
-    { weekday: 4, time: "17:00", group_type: "스페셜" },
-  ],
-  "5": [
-    { weekday: 1, time: "15:00", group_type: "일반2" },
-    { weekday: 3, time: "15:00", group_type: "일반2" },
-  ],
-  "6": [
-    { weekday: 2, time: "15:00", group_type: "일반1" },
-    { weekday: 4, time: "15:00", group_type: "일반1" },
-    { weekday: 6, time: "15:00", group_type: "일반1" },
-  ],
-  "7": [
-    { weekday: 1, time: "17:00", group_type: "스페셜" },
-    { weekday: 3, time: "17:00", group_type: "스페셜" },
-    { weekday: 5, time: "17:00", group_type: "스페셜" },
-  ],
-  "8": [
-    { weekday: 2, time: "17:00", group_type: "일반2" },
-    { weekday: 4, time: "17:00", group_type: "일반2" },
-  ],
-}
-
-// 시드 기반 난수 (학생 ID + 날짜 기반으로 일관된 결과)
-function seededRand(seed: number): number {
-  const s = (seed * 1103515245 + 12345) & 0x7fffffff
-  return s / 0x7fffffff
-}
-
-// 학생의 이번 달 출석 기록 생성
-function generateMonthlyAttendance(studentId: string): MonthlyAttendanceItem[] {
-  const schedules = STUDENT_SCHEDULES[studentId]
-  if (!schedules || schedules.length === 0) return []
-
-  const idNum = parseInt(studentId) || 0
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = now.getMonth()
-  const today = now.getDate()
-  const items: MonthlyAttendanceItem[] = []
-  let attId = idNum * 10000
-
-  // 이번 달 1일부터 말일까지
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-
-  for (let day = 1; day <= daysInMonth; day++) {
-    const d = new Date(year, month, day)
-    const weekday = d.getDay()
-
-    for (const schedule of schedules) {
-      if (schedule.weekday !== weekday) continue
-
-      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-      let status: AttendanceStatus
-
-      if (day > today) {
-        status = "예정"
-      } else {
-        // 시드 기반으로 출석/결석 결정 (약 20%가 결석)
-        const r = seededRand(idNum * 100 + day * 7 + schedule.weekday)
-        status = r < 0.2 ? "결석" : "출석"
-      }
-
-      items.push({
-        id: String(attId++),
-        date: dateStr,
-        time: schedule.time,
-        group_type: schedule.group_type,
-        status,
-      })
-    }
-  }
-
-  return items
+  status: string
 }
 
 type Props = {
@@ -166,7 +74,7 @@ export default function AddClassStudentModal({ isOpen, onClose, classItem, onAdd
 
   const [step, setStep] = useState<Step>(isTrial ? "trial-form" : "search")
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedStudent, setSelectedStudent] = useState<ClassStudent | null>(null)
+  const [selectedStudent, setSelectedStudent] = useState<SearchableStudent | null>(null)
   const [selectedKind, setSelectedKind] = useState<"정규" | "보강" | null>(null)
 
   // 체험 학생 폼
@@ -174,6 +82,42 @@ export default function AddClassStudentModal({ isOpen, onClose, classItem, onAdd
   const [trialPhone, setTrialPhone] = useState("")
   const [trialGrade, setTrialGrade] = useState("")
   const [trialGender, setTrialGender] = useState<Gender>("남")
+
+  // Supabase 데이터
+  const [allStudents, setAllStudents] = useState<SearchableStudent[]>([])
+  const [loadingStudents, setLoadingStudents] = useState(false)
+  const [monthlyAttendance, setMonthlyAttendance] = useState<MonthlyAttendanceItem[]>([])
+  const [loadingAttendance, setLoadingAttendance] = useState(false)
+
+  // 모달 열릴 때 학생 목록 로드
+  useEffect(() => {
+    if (!isOpen || isTrial) return
+    let cancelled = false
+    setLoadingStudents(true)
+    fetchSearchableStudents().then((data) => {
+      if (!cancelled) {
+        setAllStudents(data as SearchableStudent[])
+        setLoadingStudents(false)
+      }
+    })
+    return () => { cancelled = true }
+  }, [isOpen, isTrial])
+
+  // 보강 선택 시 월별 출석 로드
+  useEffect(() => {
+    if (step !== "select-class" || !selectedStudent) return
+    let cancelled = false
+    setLoadingAttendance(true)
+    const now = new Date()
+    const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+    fetchMonthlyAttendance(selectedStudent.id, yearMonth).then((data) => {
+      if (!cancelled) {
+        setMonthlyAttendance(data)
+        setLoadingAttendance(false)
+      }
+    })
+    return () => { cancelled = true }
+  }, [step, selectedStudent])
 
   const resetState = () => {
     setStep(isTrial ? "trial-form" : "search")
@@ -184,6 +128,7 @@ export default function AddClassStudentModal({ isOpen, onClose, classItem, onAdd
     setTrialPhone("")
     setTrialGrade("")
     setTrialGender("남")
+    setMonthlyAttendance([])
   }
 
   const handleClose = () => {
@@ -205,56 +150,61 @@ export default function AddClassStudentModal({ isOpen, onClose, classItem, onAdd
   }
 
   // 학생 선택 → 정규/보강 선택 단계로
-  const handleSelectStudent = (student: ClassStudent) => {
+  const handleSelectStudent = (student: SearchableStudent) => {
     setSelectedStudent(student)
     setStep("select-kind")
   }
 
   // 정규/보강 선택
-  const handleSelectKind = (kind: "정규" | "보강") => {
+  const handleSelectKind = async (kind: "정규" | "보강") => {
     setSelectedKind(kind)
     if (!selectedStudent) return
 
     if (kind === "보강") {
-      // 보강 → 원래 수업 선택 단계로
       setStep("select-class")
       return
     }
 
-    const classStudent: ClassStudent = {
+    // 정규: 바로 출석 레코드 생성
+    await upsertAttendance({
+      student_id: selectedStudent.id,
+      class_id: classItem.id,
+      status: "예정",
+    })
+    onAddStudent?.({
       id: selectedStudent.id,
       name: selectedStudent.name,
       grade: selectedStudent.grade,
       level: selectedStudent.level,
-    }
-    onAddStudent?.(classStudent, kind)
+    }, kind)
     onStudentAdded?.()
     handleClose()
   }
 
   // 보강 시 원래 출석 기록 선택
-  const handleSelectSourceAttendance = (attendance: MonthlyAttendanceItem) => {
+  const handleSelectSourceAttendance = async (attendance: MonthlyAttendanceItem) => {
     if (!selectedStudent) return
-    const classStudent: ClassStudent = {
+    await upsertAttendance({
+      student_id: selectedStudent.id,
+      class_id: classItem.id,
+      status: "보강예정",
+      makeup_of_attendance_id: attendance.id,
+    })
+    onAddStudent?.({
       id: selectedStudent.id,
       name: selectedStudent.name,
       grade: selectedStudent.grade,
       level: selectedStudent.level,
-    }
-    onAddStudent?.(classStudent, "보강", attendance.id)
+    }, "보강", attendance.id)
     onStudentAdded?.()
     handleClose()
   }
 
-  // 선택한 학생의 이번 달 출석 기록
-  const monthlyAttendance = useMemo(() => {
-    if (!selectedStudent) return []
-    return generateMonthlyAttendance(selectedStudent.id)
-  }, [selectedStudent])
-
   // 체험 학생 등록
-  const handleConfirmTrial = () => {
+  const handleConfirmTrial = async () => {
     if (!trialName.trim()) return
+    // 체험 학생은 students 테이블에 status='체험'으로 등록 후 출석 추가해야 하지만,
+    // 현재는 간편 등록으로 로컬 추가만 수행
     const classStudent: ClassStudent = {
       id: String(Date.now()),
       name: trialName.trim(),
@@ -269,9 +219,9 @@ export default function AddClassStudentModal({ isOpen, onClose, classItem, onAdd
 
   // 검색 필터
   const filteredStudents = useMemo(() => {
-    if (!searchQuery.trim()) return SEARCHABLE_STUDENTS
-    return SEARCHABLE_STUDENTS.filter((s) => s.name.includes(searchQuery.trim()))
-  }, [searchQuery])
+    if (!searchQuery.trim()) return allStudents
+    return allStudents.filter((s) => s.name.includes(searchQuery.trim()))
+  }, [searchQuery, allStudents])
 
   const stepTitle = () => {
     if (step === "search") return "학생 추가하기"
@@ -312,7 +262,11 @@ export default function AddClassStudentModal({ isOpen, onClose, classItem, onAdd
               />
             </div>
             <div className="max-h-[360px] overflow-y-auto">
-              {filteredStudents.length === 0 ? (
+              {loadingStudents ? (
+                <div className="text-sm text-muted-foreground text-center py-6">
+                  불러오는 중...
+                </div>
+              ) : filteredStudents.length === 0 ? (
                 <div className="text-sm text-muted-foreground text-center py-6">
                   검색 결과가 없습니다
                 </div>
@@ -349,7 +303,7 @@ export default function AddClassStudentModal({ isOpen, onClose, classItem, onAdd
                         <td className="py-2 px-1 whitespace-nowrap">{student.classTime}</td>
                         <td className="py-2 px-1 whitespace-nowrap">{student.phone}</td>
                         <td className="py-2 px-1">
-                          <StatusBadge status={student.status} />
+                          <StatusBadge status={student.status as StudentStatus} />
                         </td>
                       </tr>
                     ))}
@@ -407,7 +361,11 @@ export default function AddClassStudentModal({ isOpen, onClose, classItem, onAdd
               <span className="text-xs text-muted-foreground">{selectedStudent.grade}</span>
             </div>
             <p className="text-sm text-muted-foreground">어떤 수업의 보강인가요? (이번 달 출석 현황)</p>
-            {monthlyAttendance.length === 0 ? (
+            {loadingAttendance ? (
+              <div className="text-sm text-muted-foreground text-center py-6">
+                불러오는 중...
+              </div>
+            ) : monthlyAttendance.length === 0 ? (
               <div className="text-sm text-muted-foreground text-center py-6">
                 이번 달 출석 기록이 없습니다
               </div>

@@ -425,14 +425,17 @@ export async function fetchClassesByDate(date: string): Promise<{
   return { classes, attendanceMap }
 }
 
-export async function fetchClassesByWeek(start: string, end: string): Promise<ClassItem[]> {
+export async function fetchClassesByWeek(start: string, end: string): Promise<{
+  classes: ClassItem[]
+  attendanceMap: Record<string, AttendanceRecord>
+}> {
   const { data: classRows, error } = await supabase
     .from('classes')
     .select(`
       id, date, time, group_type,
       attendance (
-        student_id,
-        students:student_id (id, name, birth_date, current_level, status)
+        id, student_id, status, makeup_of_attendance_id, memo,
+        students:student_id (id, name, birth_date, gender, current_level, status)
       )
     `)
     .eq('branch_id', DEFAULT_BRANCH_ID)
@@ -442,24 +445,45 @@ export async function fetchClassesByWeek(start: string, end: string): Promise<Cl
 
   if (error) {
     console.error('fetchClassesByWeek error:', error)
-    return []
+    return { classes: [], attendanceMap: {} }
   }
 
-  return (classRows || []).map((cls: any) => ({
-    id: cls.id,
-    date: cls.date,
-    time: cls.time,
-    group_type: cls.group_type,
-    students: (cls.attendance || [])
-      .filter((att: any) => att.students)
-      .map((att: any) => ({
-        id: att.students.id,
-        name: att.students.name,
-        grade: calculateGrade(att.students.birth_date),
-        level: att.students.current_level || '',
-        isTrial: att.students.status === '체험',
-      })),
-  }))
+  const classes: ClassItem[] = []
+  const attendanceMap: Record<string, AttendanceRecord> = {}
+
+  for (const cls of classRows || []) {
+    const students: ClassStudent[] = []
+    for (const att of cls.attendance || []) {
+      const student = att.students as any
+      if (!student) continue
+      students.push({
+        id: student.id,
+        name: student.name,
+        grade: calculateGrade(student.birth_date),
+        level: student.current_level || '',
+        isTrial: student.status === '체험',
+      })
+      const key = `${cls.date}-${cls.id}-${student.id}`
+      attendanceMap[key] = {
+        id: att.id,
+        student_id: student.id,
+        class_id: cls.id,
+        status: att.status,
+        makeup_of_attendance_id: att.makeup_of_attendance_id,
+        memo: att.memo || '',
+      }
+    }
+
+    classes.push({
+      id: cls.id,
+      date: cls.date,
+      time: cls.time,
+      group_type: cls.group_type,
+      students,
+    })
+  }
+
+  return { classes, attendanceMap }
 }
 
 export async function createClass(data: {
