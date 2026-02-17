@@ -7,11 +7,11 @@ type Props = {
   classes: ClassItem[]
   attendanceMap: Record<string, AttendanceRecord>
   memoMap?: Record<string, string>
-  onToggleAttendance: (studentId: number, classId: number) => void
-  onStudentClick?: (studentId: number) => void
+  onToggleAttendance: (studentId: string, classId: string) => void
+  onStudentClick?: (studentId: string) => void
   onAddClick?: (classItem: ClassItem) => void
-  onMarkAllPresent?: (classId: number) => void
-  onMemoChange?: (classId: number, studentId: number, value: string) => void
+  onMarkAllPresent?: (classId: string) => void
+  onMemoChange?: (classId: string, studentId: string, value: string) => void
 }
 
 function TimeSlotSection({ time, classes, attendanceMap, memoMap, onToggleAttendance, onStudentClick, onAddClick, onMarkAllPresent, onMemoChange }: Props) {
@@ -25,7 +25,7 @@ function TimeSlotSection({ time, classes, attendanceMap, memoMap, onToggleAttend
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
         {classes.map((cls) => (
           <ClassDetailCard
-            key={cls.class_id}
+            key={cls.id}
             classItem={cls}
             attendanceMap={attendanceMap}
             memoMap={memoMap}

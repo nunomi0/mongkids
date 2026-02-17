@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { Gender, TrialReservation } from "@/types/student"
+import type { Gender } from "@/types/student"
 
 const GRADE_OPTIONS = [
   "6세", "7세",
@@ -35,7 +35,7 @@ const TIME_OPTIONS = Array.from({ length: 14 }, (_, i) => {
 type Props = {
   isOpen: boolean
   onClose: () => void
-  onSaved: (reservation: TrialReservation) => void
+  onSaved: (data: { name: string; phone: string; gender: string; grade: string }) => void
 }
 
 export default function AddTrialModal({ isOpen, onClose, onSaved }: Props) {
@@ -61,25 +61,18 @@ export default function AddTrialModal({ isOpen, onClose, onSaved }: Props) {
   }, [resetForm, onClose])
 
   const handleSubmit = () => {
-    if (!name.trim() || !phone.trim() || !trialDate) return
+    if (!name.trim() || !phone.trim()) return
 
-    const reservation: TrialReservation = {
-      id: Date.now(),
+    onSaved({
       name: name.trim(),
       phone: phone.trim(),
       gender,
       grade,
-      status: "예정",
-      trial_date: trialDate,
-      trial_time: trialTime,
-      note: "",
-      created_at: new Date().toISOString(),
-    }
-    onSaved(reservation)
+    })
     handleClose()
   }
 
-  const isValid = !!name.trim() && !!phone.trim() && !!trialDate
+  const isValid = !!name.trim() && !!phone.trim()
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
@@ -146,31 +139,6 @@ export default function AddTrialModal({ isOpen, onClose, onSaved }: Props) {
                 <SelectContent>
                   {GRADE_OPTIONS.map((g) => (
                     <SelectItem key={g} value={g}>{g}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>
-                체험 날짜 <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                type="date"
-                value={trialDate}
-                onChange={(e) => setTrialDate(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>수업 시간</Label>
-              <Select value={trialTime} onValueChange={setTrialTime}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TIME_OPTIONS.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

@@ -13,11 +13,23 @@ import type {
   LevelType,
 } from "@/types/student"
 
+// 그룹 타입별 카드 색상
+const GROUP_CARD_STYLES: Record<string, { border: string; headerBg: string; headerText: string }> = {
+  "일반1": { border: "", headerBg: "", headerText: "" },
+  "일반2": { border: "", headerBg: "", headerText: "" },
+  "스페셜": { border: "border-amber-200", headerBg: "bg-amber-50", headerText: "text-amber-700" },
+  "체험": { border: "border-violet-200", headerBg: "bg-violet-50", headerText: "text-violet-700" },
+}
+
+const DEFAULT_CARD_STYLE = { border: "", headerBg: "", headerText: "" }
+
 // 출석 상태 스타일
-const STATUS_STYLES: Record<AttendanceStatus, { bg: string; text: string; border: string }> = {
+const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
   예정: { bg: "bg-white", text: "text-gray-500", border: "border-gray-200" },
   출석: { bg: "bg-green-50", text: "text-green-700", border: "border-green-300" },
   결석: { bg: "bg-red-50", text: "text-red-700", border: "border-red-300" },
+  보강예정: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-300" },
+  보강완료: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-300" },
 }
 
 function StudentRow({
@@ -35,11 +47,11 @@ function StudentRow({
   memo: string
   isExpanded: boolean
   onToggle: () => void
-  onNameClick?: (studentId: number) => void
+  onNameClick?: (studentId: string) => void
   onMemoToggle: () => void
   onMemoChange: (value: string) => void
 }) {
-  const style = STATUS_STYLES[status]
+  const style = STATUS_STYLES[status] || STATUS_STYLES["예정"]
   const hasMemo = !!memoText.trim()
 
   return (
@@ -117,44 +129,54 @@ type Props = {
   classItem: ClassItem
   attendanceMap: Record<string, AttendanceRecord>
   memoMap?: Record<string, string>
-  onToggleAttendance: (studentId: number, classId: number) => void
-  onStudentClick?: (studentId: number) => void
+  onToggleAttendance: (studentId: string, classId: string) => void
+  onStudentClick?: (studentId: string) => void
   onAddClick?: () => void
-  onMarkAllPresent?: (classId: number) => void
-  onMemoChange?: (classId: number, studentId: number, value: string) => void
+  onMarkAllPresent?: (classId: string) => void
+  onMemoChange?: (classId: string, studentId: string, value: string) => void
 }
 
 function ClassDetailCard({ classItem, attendanceMap, memoMap = {}, onToggleAttendance, onStudentClick, onAddClick, onMarkAllPresent, onMemoChange }: Props) {
-  const { class_id, date, time, group_type, students } = classItem
+  const { id, date, time, group_type, students } = classItem
 
-  // 메모 확장 상태 (로컬)
-  const [expandedMemos, setExpandedMemos] = useState<Set<number>>(new Set())
+  const storageKey = `mongkids:memos:class:${id}`
+  const [expandedMemos, setExpandedMemos] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set()
+    try {
+      const saved = localStorage.getItem(storageKey)
+      return saved ? new Set(JSON.parse(saved)) : new Set()
+    } catch {
+      return new Set()
+    }
+  })
 
-  const openMemo = useCallback((studentId: number) => {
+  const toggleMemo = useCallback((studentId: string) => {
     setExpandedMemos((prev) => {
-      if (prev.has(studentId)) return prev
       const next = new Set(prev)
-      next.add(studentId)
+      if (next.has(studentId)) next.delete(studentId)
+      else next.add(studentId)
+      localStorage.setItem(storageKey, JSON.stringify([...next]))
       return next
     })
-  }, [])
+  }, [storageKey])
 
   // 출석 통계
   let present = 0
   let absent = 0
   for (const st of students) {
-    const key = `${date}-${class_id}-${st.id}`
+    const key = `${date}-${id}-${st.id}`
     const record = attendanceMap[key]
     if (record?.status === "출석") present++
     else if (record?.status === "결석") absent++
   }
 
+  const groupStyle = GROUP_CARD_STYLES[group_type] || DEFAULT_CARD_STYLE
 
   return (
-    <Card className="group/card">
-      <CardHeader className="pb-3">
+    <Card className={`group/card ${groupStyle.border}`}>
+      <CardHeader className={`pb-3 ${groupStyle.headerBg} rounded-t-lg`}>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm">
+          <CardTitle className={`text-sm ${groupStyle.headerText}`}>
             {time} · {group_type}
           </CardTitle>
           <div className="flex items-center gap-2 text-xs">
@@ -168,7 +190,7 @@ function ClassDetailCard({ classItem, attendanceMap, memoMap = {}, onToggleAtten
                 className="h-6 px-2 text-xs text-green-600 hover:text-green-700 hover:bg-green-50"
                 onClick={(e) => {
                   e.stopPropagation()
-                  onMarkAllPresent(class_id)
+                  onMarkAllPresent(id)
                 }}
               >
                 <CheckCheck className="h-3 w-3 mr-1" />
@@ -185,10 +207,10 @@ function ClassDetailCard({ classItem, attendanceMap, memoMap = {}, onToggleAtten
           </div>
         ) : (
           students.map((st) => {
-            const key = `${date}-${class_id}-${st.id}`
+            const key = `${date}-${id}-${st.id}`
             const record = attendanceMap[key]
             const status: AttendanceStatus = record?.status ?? "예정"
-            const memoKey = `${class_id}-${st.id}`
+            const memoKey = `${id}-${st.id}`
 
             return (
               <StudentRow
@@ -197,10 +219,10 @@ function ClassDetailCard({ classItem, attendanceMap, memoMap = {}, onToggleAtten
                 status={status}
                 memo={memoMap[memoKey] ?? ""}
                 isExpanded={expandedMemos.has(st.id)}
-                onToggle={() => onToggleAttendance(st.id, class_id)}
+                onToggle={() => onToggleAttendance(st.id, id)}
                 onNameClick={onStudentClick}
-                onMemoToggle={() => openMemo(st.id)}
-                onMemoChange={(value) => onMemoChange?.(class_id, st.id, value)}
+                onMemoToggle={() => toggleMemo(st.id)}
+                onMemoChange={(value) => onMemoChange?.(id, st.id, value)}
               />
             )
           })

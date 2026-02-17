@@ -6,11 +6,9 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -30,11 +28,6 @@ const GRADE_OPTIONS = [
   "고1", "고2", "고3",
 ]
 
-const TIME_OPTIONS = Array.from({ length: 14 }, (_, i) => {
-  const h = (9 + i).toString().padStart(2, "0")
-  return `${h}:00`
-})
-
 const STATUS_OPTIONS: TrialStatus[] = ["예정", "노쇼", "미등록", "등록"]
 
 type Props = {
@@ -42,7 +35,7 @@ type Props = {
   onClose: () => void
   reservation: TrialReservation | null
   onUpdate: (updated: TrialReservation) => void
-  onDelete: (id: number) => void
+  onDelete: (id: string) => void
 }
 
 export default function TrialDetailModal({ isOpen, onClose, reservation, onUpdate, onDelete }: Props) {
@@ -53,8 +46,6 @@ export default function TrialDetailModal({ isOpen, onClose, reservation, onUpdat
     gender: "" as Gender | "",
     grade: "",
     status: "예정" as TrialStatus,
-    trial_date: "",
-    trial_time: "",
     note: "",
   })
 
@@ -66,8 +57,6 @@ export default function TrialDetailModal({ isOpen, onClose, reservation, onUpdat
         gender: reservation.gender,
         grade: reservation.grade,
         status: reservation.status,
-        trial_date: reservation.trial_date,
-        trial_time: reservation.trial_time,
         note: reservation.note,
       })
       setIsEditMode(false)
@@ -91,8 +80,6 @@ export default function TrialDetailModal({ isOpen, onClose, reservation, onUpdat
       gender: reservation.gender,
       grade: reservation.grade,
       status: reservation.status,
-      trial_date: reservation.trial_date,
-      trial_time: reservation.trial_time,
       note: reservation.note,
     })
     setIsEditMode(false)
@@ -181,33 +168,6 @@ export default function TrialDetailModal({ isOpen, onClose, reservation, onUpdat
                 <Input value={editForm.phone} onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))} className="mt-1 h-8" />
               ) : (
                 <span className="ml-2">{reservation.phone}</span>
-              )}
-            </div>
-
-            <div className="text-sm">
-              <span className="text-muted-foreground">체험 날짜:</span>
-              {isEditMode ? (
-                <Input type="date" value={editForm.trial_date} onChange={(e) => setEditForm((f) => ({ ...f, trial_date: e.target.value }))} className="mt-1 h-8" />
-              ) : (
-                <span className="ml-2">{reservation.trial_date || "-"}</span>
-              )}
-            </div>
-
-            <div className="text-sm">
-              <span className="text-muted-foreground">체험 시간:</span>
-              {isEditMode ? (
-                <Select value={editForm.trial_time} onValueChange={(v) => setEditForm((f) => ({ ...f, trial_time: v }))}>
-                  <SelectTrigger className="mt-1 h-8">
-                    <SelectValue placeholder="시간 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIME_OPTIONS.map((t) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <span className="ml-2">{reservation.trial_time || "-"}</span>
               )}
             </div>
 

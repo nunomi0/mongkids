@@ -102,8 +102,23 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS + shadcn/ui 기�
 
 ---
 
-## 6. 미구현 / 예정 기능
-- Supabase 연동 (현재 더미 데이터)
+## 6. 데이터베이스 (Supabase)
+
+### 6.1 스키마 설계
+- 9개 테이블: branches, students, student_schedules, student_levels, payments, classes, attendance, trial_reservations, level_test_configs
+- 멀티 지점 지원 (단일 DB + branch_id, 약 24개 지점)
+- `supabase/migrations/001_initial_schema.sql`
+
+### 6.2 핵심 설계
+- 보강 추적: attendance.status 5단계 (예정→출석/결석→보강예정→보강완료) + self-referencing FK
+- 레벨 테스트: student_levels.acquired_date (null=미취득, 날짜=합격일)
+- 결제 할인: payments.discounts JSONB 배열
+- updated_at 자동 갱신 트리거 (students, payments)
+
+---
+
+## 7. 미구현 / 예정 기능
+- Supabase 연동 코드 (현재 더미 데이터)
 - 인증/로그인
 - 메인 대시보드 콘텐츠
 - 수업별 학생 메모 기능

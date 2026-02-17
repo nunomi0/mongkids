@@ -15,6 +15,7 @@ import { Plus, Users, Check, X, Clock, Ban } from "lucide-react"
 import TrialsTable from "./trials-table"
 import AddTrialModal from "./add-trial-modal"
 import TrialDetailModal from "./trial-detail-modal"
+import { createTrial, updateTrial as updateTrialApi, deleteTrial as deleteTrialApi } from "@/lib/queries"
 import type { TrialReservation, TrialStatus } from "@/types/student"
 
 type StatusFilterValue = TrialStatus | "all"
@@ -35,7 +36,7 @@ export default function TrialsClient({
   const [trials, setTrials] = useState(initialTrials)
   const [query, setQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<StatusFilterValue>("all")
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
 
   // 필터링
@@ -67,20 +68,33 @@ export default function TrialsClient({
     return trials.find((t) => t.id === selectedId) ?? null
   }, [trials, selectedId])
 
-  const handleRowClick = useCallback((id: number) => setSelectedId(id), [])
+  const handleRowClick = useCallback((id: string) => setSelectedId(id), [])
   const handleDetailClose = useCallback(() => setSelectedId(null), [])
 
-  const handleAdd = useCallback((reservation: TrialReservation) => {
-    setTrials((prev) => [reservation, ...prev])
+  const handleAdd = useCallback(async (data: { name: string; phone: string; gender: string; grade: string }) => {
+    const created = await createTrial(data)
+    if (created) {
+      setTrials((prev) => [created, ...prev])
+    }
   }, [])
 
-  const handleUpdate = useCallback((updated: TrialReservation) => {
+  const handleUpdate = useCallback(async (updated: TrialReservation) => {
     setTrials((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
+    await updateTrialApi(updated)
   }, [])
 
-  const handleDelete = useCallback((id: number) => {
+  const handleDelete = useCallback(async (id: string) => {
     setTrials((prev) => prev.filter((t) => t.id !== id))
+    await deleteTrialApi(id)
   }, [])
+
+  const handleNoteChange = useCallback(async (id: string, note: string) => {
+    setTrials((prev) => prev.map((t) => (t.id === id ? { ...t, note } : t)))
+    const trial = trials.find((t) => t.id === id)
+    if (trial) {
+      await updateTrialApi({ ...trial, note })
+    }
+  }, [trials])
 
   return (
     <>
@@ -141,7 +155,7 @@ export default function TrialsClient({
         </div>
 
         {/* 테이블 */}
-        <TrialsTable trials={filtered} onRowClick={handleRowClick} />
+        <TrialsTable trials={filtered} onRowClick={handleRowClick} onNoteChange={handleNoteChange} />
       </div>
 
       {/* 체험 추가 모달 */}

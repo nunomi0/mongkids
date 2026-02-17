@@ -1,6 +1,7 @@
 import { memo } from "react"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
+import { formatClassName, formatClassTime } from "@/lib/utils/student"
 import type { Student } from "@/types/student"
 
 type Props = {
@@ -24,7 +25,6 @@ function calculateAge(birthDate: string): string {
 
 function formatSchedules(student: Student): string {
   if (!student.schedules || student.schedules.length === 0) return "-"
-
   return student.schedules
     .map((s) => `${WEEKDAYS[s.weekday]}${s.time}(${s.group_type})`)
     .join(", ")
@@ -33,6 +33,7 @@ function formatSchedules(student: Student): string {
 function ProfileSection({ className, student }: Props) {
   const age = calculateAge(student.birth_date)
   const scheduleText = formatSchedules(student)
+  const classNameText = formatClassName(student.category, student.sessions_per_week)
 
   return (
     <Card className={cn(className)}>
@@ -42,13 +43,11 @@ function ProfileSection({ className, student }: Props) {
 
       <CardContent className="space-y-1 text-sm">
         <div className="font-semibold text-base">{student.name}</div>
-
         <div className="text-muted-foreground">
           {student.birth_date} ({age}) · {student.gender}
         </div>
-        <div className="text-muted-foreground">
-          {scheduleText}
-        </div>
+        <div className="text-muted-foreground">등록반: {classNameText}</div>
+        <div className="text-muted-foreground">{scheduleText}</div>
         <div>신발 사이즈: {student.shoe_size || "-"}</div>
         <div>전화번호: {student.phone}</div>
         <div>메모: {student.memo || "-"}</div>

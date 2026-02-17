@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { ChevronLeft, ChevronRight, CalendarDays, Plus } from "lucide-react"
 import LevelBadge from "@/components/level-badge"
 import ClassDetailCard from "../class-detail-card"
@@ -17,7 +18,6 @@ import type {
   LevelType,
   AttendanceRecord,
   AttendanceStatus,
-  AttendanceKind,
 } from "@/types/student"
 
 // ── 유틸 ──
@@ -108,29 +108,40 @@ const MiniCalendar = memo(function MiniCalendar({
   }, [])
 
   return (
-    <Card className="p-4 w-fit">
-      <div className="flex items-center justify-between mb-2">
+    <div className="w-[260px]">
+      <div className="flex items-center justify-between mb-3">
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goCalPrev}>
           <ChevronLeft className="h-3.5 w-3.5" />
         </Button>
-        <span className="text-sm font-medium">{calYear}년 {calMonth + 1}월</span>
+        <span className="text-sm font-semibold">{calYear}년 {calMonth + 1}월</span>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goCalNext}>
           <ChevronRight className="h-3.5 w-3.5" />
         </Button>
       </div>
       <div className="grid grid-cols-7 text-center text-[11px] text-muted-foreground mb-1">
-        {["월", "화", "수", "목", "금", "토", "일"].map((d) => <div key={d} className="py-0.5 w-8">{d}</div>)}
+        {["월", "화", "수", "목", "금", "토", "일"].map((d) => (
+          <div key={d} className={`py-1 ${d === "토" ? "text-blue-500" : d === "일" ? "text-red-500" : ""}`}>{d}</div>
+        ))}
       </div>
       <div className="grid grid-cols-7 text-center text-xs">
         {grid.map((cell, idx) => {
-          if (!cell) return <div key={`e-${idx}`} className="py-1 w-8" />
+          if (!cell) return <div key={`e-${idx}`} className="py-1.5" />
           const ds = toDateStr(cell)
+          const isInWeek = weekDateStrs.has(ds)
+          const isToday = ds === todayStr
+          const isSat = cell.getDay() === 6
+          const isSun = cell.getDay() === 0
+
           return (
             <div
               key={ds}
-              className={`py-1 w-8 cursor-pointer rounded transition-colors ${
-                weekDateStrs.has(ds) ? "bg-blue-100 text-blue-700 font-medium" : "hover:bg-muted"
-              } ${ds === todayStr ? "ring-1 ring-blue-400" : ""}`}
+              className={`py-1.5 cursor-pointer rounded-md transition-colors ${
+                isInWeek
+                  ? "bg-blue-500 text-white font-medium"
+                  : "hover:bg-muted"
+              } ${isToday && !isInWeek ? "ring-1 ring-blue-400 font-medium" : ""} ${
+                !isInWeek && isSat ? "text-blue-500" : !isInWeek && isSun ? "text-red-500" : ""
+              }`}
               onClick={() => onSelectWeek(getMonday(cell))}
             >
               {cell.getDate()}
@@ -138,21 +149,21 @@ const MiniCalendar = memo(function MiniCalendar({
           )
         })}
       </div>
-    </Card>
+    </div>
   )
 })
 
 // ── 더미 데이터 ──
 
 const DUMMY_STUDENTS: ClassStudent[] = [
-  { id: 1, name: "김민준", grade: "초3", level: "GREEN" },
-  { id: 2, name: "이서윤", grade: "초4", level: "BLUE" },
-  { id: 3, name: "박지호", grade: "초2", level: "YELLOW" },
-  { id: 4, name: "최수아", grade: "초5", level: "RED" },
-  { id: 5, name: "정예준", grade: "초1", level: "WHITE" },
-  { id: 6, name: "강하늘", grade: "초3", level: "GREEN" },
-  { id: 7, name: "윤서진", grade: "초6", level: "BLACK" },
-  { id: 8, name: "임도윤", grade: "성인", level: "GOLD" },
+  { id: "1", name: "김민준", grade: "초3", level: "GREEN" },
+  { id: "2", name: "이서윤", grade: "초4", level: "BLUE" },
+  { id: "3", name: "박지호", grade: "초2", level: "YELLOW" },
+  { id: "4", name: "최수아", grade: "초5", level: "RED" },
+  { id: "5", name: "정예준", grade: "초1", level: "WHITE" },
+  { id: "6", name: "강하늘", grade: "초3", level: "GREEN" },
+  { id: "7", name: "윤서진", grade: "초6", level: "BLACK" },
+  { id: "8", name: "임도윤", grade: "성인", level: "GOLD" },
 ]
 
 const ALL_GROUP_TYPES: GroupType[] = ["일반1", "일반2", "스페셜", "체험"]
@@ -179,7 +190,7 @@ function generateWeekClasses(monday: Date): ClassItem[] {
         const assigned = Array.from({ length: count }, (_, i) =>
           DUMMY_STUDENTS[(start + i) % DUMMY_STUDENTS.length],
         )
-        classes.push({ class_id: classId++, date: dateStr, time, group_type: group, students: assigned })
+        classes.push({ id: String(classId++), date: dateStr, time, group_type: group, students: assigned })
       }
     }
   }
@@ -187,6 +198,13 @@ function generateWeekClasses(monday: Date): ClassItem[] {
 }
 
 // ── 시간대 행 ──
+
+const GROUP_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  "일반1": { bg: "bg-white", text: "text-gray-700", border: "border-gray-200" },
+  "일반2": { bg: "bg-white", text: "text-gray-700", border: "border-gray-200" },
+  "스페셜": { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" },
+  "체험": { bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200" },
+}
 
 const TimeSlotRow = memo(function TimeSlotRow({
   time,
@@ -205,7 +223,7 @@ const TimeSlotRow = memo(function TimeSlotRow({
 
   return (
     <tr>
-      <td className="border-r border-b p-2 text-xs font-medium text-center align-middle bg-muted/30 whitespace-nowrap">
+      <td className="border-r border-b border-border/50 px-3 py-2.5 text-xs font-medium text-center align-middle bg-muted/30 whitespace-nowrap">
         {time}
       </td>
       {weekDates.map((date) => {
@@ -218,43 +236,47 @@ const TimeSlotRow = memo(function TimeSlotRow({
         return (
           <td
             key={ds}
-            className={`group/cell border-r border-b p-1.5 align-top text-xs ${
-              isToday ? "bg-blue-50/50" : isSunday ? "bg-muted/30" : ""
+            className={`group/cell border-r border-b border-border/50 p-1.5 align-top text-xs min-w-[140px] ${
+              isToday ? "bg-blue-50/40" : isSunday ? "bg-muted/20" : ""
             }`}
           >
             {cellClasses.length === 0 ? (
-              <span className="text-muted-foreground/40">-</span>
+              <div className="flex items-center justify-center h-10 text-muted-foreground/30">-</div>
             ) : (
-              <div className="space-y-1">
-                {cellClasses.map((cls) => (
-                  <div
-                    key={cls.class_id}
-                    className="rounded p-1 cursor-pointer transition-colors hover:bg-blue-50 hover:ring-1 hover:ring-blue-200"
-                    onClick={() => onClassClick(cls)}
-                  >
-                    <Badge variant="outline" className="text-[9px] px-1 py-0 mb-0.5">
-                      {cls.group_type}
-                    </Badge>
-                    <div className="space-y-0.5">
-                      {cls.students.map((st) => (
-                        <div key={st.id} className="inline-flex items-center gap-1 mr-1.5">
-                          {st.level && <LevelBadge level={st.level as LevelType} size={8} radius={1} />}
-                          <span>{st.name}</span>
-                          <span className="text-muted-foreground">{st.grade}</span>
-                        </div>
-                      ))}
+              <div className="space-y-1.5">
+                {cellClasses.map((cls) => {
+                  const color = GROUP_COLORS[cls.group_type] || { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200" }
+                  return (
+                    <div
+                      key={cls.id}
+                      className={`rounded-md p-1.5 cursor-pointer transition-all border ${color.border} ${color.bg} hover:shadow-sm`}
+                      onClick={() => onClassClick(cls)}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`text-[10px] font-medium ${color.text}`}>
+                          {cls.group_type}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">{cls.students.length}명</span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-1.5 gap-y-0.5">
+                        {cls.students.map((st) => (
+                          <span key={st.id} className="inline-flex items-center gap-0.5">
+                            {st.level && <LevelBadge level={st.level as LevelType} size={7} radius={1} />}
+                            <span className="text-[11px]">{st.name}</span>
+                            <span className="text-[10px] text-muted-foreground">{st.grade}</span>
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
-            {/* 수업 추가 버튼 — 하단 영역, hover 시 노출 */}
             <div
-              className="mt-1.5 rounded h-6 flex items-center justify-center cursor-pointer opacity-0 group-hover/cell:opacity-100 transition-all text-muted-foreground/50 hover:!bg-blue-50 hover:!text-blue-600"
+              className="mt-1 rounded-md h-5 flex items-center justify-center cursor-pointer opacity-0 group-hover/cell:opacity-100 transition-all text-muted-foreground/40 hover:bg-blue-50 hover:text-blue-500"
               onClick={() => onAddClassClick(ds, time)}
             >
-              <Plus className="h-3 w-3 mr-0.5" />
-              <span className="text-[10px]">수업 추가</span>
+              <Plus className="h-3 w-3" />
             </div>
           </td>
         )
@@ -275,7 +297,7 @@ export default function WeeklyPage() {
     setLocalClasses(generateWeekClasses(monday))
   }, [monday])
 
-  const [showCalendar, setShowCalendar] = useState(false)
+  const [calendarOpen, setCalendarOpen] = useState(false)
   const [modalClass, setModalClass] = useState<ClassItem | null>(null)
   const [attendanceMap, setAttendanceMap] = useState<Record<string, AttendanceRecord>>({})
   const [addTargetClass, setAddTargetClass] = useState<ClassItem | null>(null)
@@ -305,10 +327,10 @@ export default function WeeklyPage() {
     if (!modalClass) return {}
     const result: Record<string, AttendanceRecord> = {}
     for (const st of modalClass.students) {
-      const detailKey = `${modalClass.date}-${modalClass.class_id}-${st.id}`
-      const simpleKey = `${modalClass.class_id}-${st.id}`
+      const detailKey = `${modalClass.date}-${modalClass.id}-${st.id}`
+      const simpleKey = `${modalClass.id}-${st.id}`
       const record = attendanceMap[detailKey] || attendanceMap[simpleKey]
-      if (record) result[detailKey] = { ...record, date: modalClass.date }
+      if (record) result[detailKey] = record
     }
     return result
   }, [attendanceMap, modalClass])
@@ -327,7 +349,7 @@ export default function WeeklyPage() {
 
   const handleSelectWeek = useCallback((newMonday: Date) => {
     setMonday(newMonday)
-    setShowCalendar(false)
+    setCalendarOpen(false)
   }, [])
 
   const handleClassClick = useCallback((cls: ClassItem) => {
@@ -335,7 +357,7 @@ export default function WeeklyPage() {
   }, [])
 
   const handleToggleAttendance = useCallback(
-    (studentId: number, classId: number) => {
+    (studentId: string, classId: string) => {
       const simpleKey = `${classId}-${studentId}`
       const cycle: AttendanceStatus[] = ["예정", "출석", "결석"]
       setAttendanceMap((prev) => {
@@ -347,14 +369,13 @@ export default function WeeklyPage() {
         return {
           ...prev,
           [simpleKey]: {
-            id: Date.now(), student_id: studentId, class_id: classId,
-            date: modalClass?.date ?? "", status: "출석", kind: "정규",
-            makeup_of_attendance_id: null, note: null,
+            id: String(Date.now()), student_id: studentId, class_id: classId,
+            status: "출석", makeup_of_attendance_id: null, memo: "",
           },
         }
       })
     },
-    [modalClass],
+    [],
   )
 
   const handleAddClick = useCallback(() => {
@@ -362,10 +383,10 @@ export default function WeeklyPage() {
   }, [modalClass])
 
   const handleAddStudent = useCallback(
-    (student: ClassStudent, kind: AttendanceKind) => {
+    (student: ClassStudent, _kind: "정규" | "보강", _makeupId?: string) => {
       if (!addTargetClass) return
       setModalClass((prev) => {
-        if (!prev || prev.class_id !== addTargetClass.class_id) return prev
+        if (!prev || prev.id !== addTargetClass.id) return prev
         return { ...prev, students: [...prev.students, student] }
       })
       setAddTargetClass(null)
@@ -373,7 +394,7 @@ export default function WeeklyPage() {
     [addTargetClass],
   )
 
-  const handleMarkAllPresent = useCallback((classId: number) => {
+  const handleMarkAllPresent = useCallback((classId: string) => {
     if (!modalClass) return
     setAttendanceMap((prev) => {
       const next = { ...prev }
@@ -382,18 +403,16 @@ export default function WeeklyPage() {
         const simpleKey = `${classId}-${st.id}`
         const existing = next[detailKey] || next[simpleKey]
         if (existing) {
-          next[detailKey] = { ...existing, status: "출석", date: modalClass.date }
-          next[simpleKey] = { ...existing, status: "출석", date: modalClass.date }
+          next[detailKey] = { ...existing, status: "출석" }
+          next[simpleKey] = { ...existing, status: "출석" }
         } else {
           const record: AttendanceRecord = {
-            id: Date.now() + st.id,
+            id: String(Date.now()) + st.id,
             student_id: st.id,
             class_id: classId,
-            date: modalClass.date,
             status: "출석",
-            kind: "정규",
             makeup_of_attendance_id: null,
-            note: null,
+            memo: "",
           }
           next[detailKey] = record
           next[simpleKey] = record
@@ -403,7 +422,7 @@ export default function WeeklyPage() {
     })
   }, [modalClass])
 
-  const handleMemoChange = useCallback((classId: number, studentId: number, value: string) => {
+  const handleMemoChange = useCallback((classId: string, studentId: string, value: string) => {
     const key = `${classId}-${studentId}`
     setMemoMap((prev) => ({ ...prev, [key]: value }))
   }, [])
@@ -417,66 +436,74 @@ export default function WeeklyPage() {
     setAddClassTarget(null)
   }, [])
 
+  const { month: headerMonth, week: headerWeek } = getWeekOfMonth(monday)
+
   return (
     <>
-      <div className="w-full space-y-6 p-6">
+      <div className="w-full space-y-4 p-6">
         {/* 주 네비게이션 */}
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" onClick={goPrevWeek}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <h2 className="text-lg font-semibold min-w-[300px] text-center">
-            {formatWeekHeader(monday, sunday)}
-          </h2>
-          <Button variant="outline" size="icon" onClick={goNextWeek}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={goThisWeek}>
-            이번 주
-          </Button>
-          <Button
-            variant={showCalendar ? "secondary" : "outline"}
-            size="sm"
-            onClick={() => setShowCalendar((v) => !v)}
-          >
-            <CalendarDays className="h-4 w-4 mr-1" />
-            달력
-          </Button>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold tracking-tight">
+              {formatWeekHeader(monday, sunday)}
+            </h2>
+            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+              {headerMonth}월 {headerWeek}주차
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={goPrevWeek}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={goThisWeek}>
+              이번 주
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={goNextWeek}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={calendarOpen ? "secondary" : "outline"}
+                  size="icon"
+                  className="h-8 w-8"
+                >
+                  <CalendarDays className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-auto p-4">
+                <MiniCalendar currentMonday={monday} onSelectWeek={handleSelectWeek} />
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
 
-        {/* 달력 (토글) */}
-        {showCalendar && (
-          <MiniCalendar currentMonday={monday} onSelectWeek={handleSelectWeek} />
-        )}
-
         {/* 테이블 */}
-        <Card className="min-w-0">
+        <Card className="min-w-0 overflow-hidden">
           <CardContent className="p-0 overflow-x-auto">
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr>
-                  <th className="border-r border-b p-2 text-xs text-muted-foreground bg-muted/50 w-16">
+                  <th className="border-r border-b border-border/50 px-3 py-2.5 text-[11px] text-muted-foreground bg-muted/40 w-16 font-medium">
                     시간
                   </th>
                   {weekDates.map((date) => {
                     const ds = toDateStr(date)
                     const isToday = ds === toDateStr(new Date())
-                    const { month, week } = getWeekOfMonth(date)
+                    const isSat = date.getDay() === 6
+                    const isSun = date.getDay() === 0
 
                     return (
                       <th
                         key={ds}
-                        className={`border-r border-b p-2 text-xs font-medium ${
-                          isToday ? "bg-blue-50/50 text-blue-600" : "bg-muted/50"
+                        className={`border-r border-b border-border/50 px-2 py-2.5 text-xs font-medium min-w-[140px] ${
+                          isToday ? "bg-blue-50/60" : "bg-muted/40"
                         }`}
                       >
-                        {date.getMonth() + 1}/{date.getDate()}
-                        <br />
-                        ({WEEKDAY_KR[date.getDay()]})
-                        <br />
-                        <span className="text-[10px] text-muted-foreground font-normal">
-                          {month}월 {week}주차
-                        </span>
+                        <div className={`${isToday ? "text-blue-600" : isSat ? "text-blue-500" : isSun ? "text-red-500" : ""}`}>
+                          <span className="text-sm">{date.getDate()}</span>
+                          <span className="text-[11px] ml-0.5">({WEEKDAY_KR[date.getDay()]})</span>
+                        </div>
                       </th>
                     )
                   })}

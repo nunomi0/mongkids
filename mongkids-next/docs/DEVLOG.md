@@ -51,3 +51,40 @@
 
 ### 기술 스택
 - Next.js 16, React 19, TypeScript, Tailwind CSS, shadcn/ui
+
+---
+
+## [2026-02-12] 세션 2: Supabase 데이터베이스 스키마 설계
+
+### 작업 내용
+
+1. **Supabase 초기 스키마 설계 및 migration 파일 작성**
+   - `supabase/migrations/001_initial_schema.sql` 생성
+   - 9개 테이블: branches, students, student_schedules, student_levels, payments, classes, attendance, trial_reservations, level_test_configs
+   - 멀티 지점 지원: 단일 DB + `branch_id`로 약 24개 지점 구분
+   - `branch_id` 직접 배치: students, classes, trial_reservations (3개)
+   - 나머지 테이블은 FK를 통해 간접 참조
+
+2. **보강 상태 모델링**
+   - attendance.status에 5가지 상태: 예정, 출석, 결석, 보강예정, 보강완료
+   - `makeup_of_attendance_id` self-referencing FK로 보강 추적
+   - 기존 `kind` (정규/보강) 필드 제거, status로 통합
+
+3. **레벨 테스트 추적 간소화**
+   - student_tests 테이블 제거
+   - student_levels의 `acquired_date`로 합격 관리 (null = 미취득, 날짜 = 합격일)
+   - level_test_configs 테이블로 레벨별 테스트 주기 설정 (전체 지점 공통)
+
+4. **기타 설계 결정**
+   - class_types 테이블 제거 → students에 category + sessions_per_week 직접 저장
+   - student_contacts 제거 → students.phone으로 단순화
+   - payments.discounts를 JSONB 배열로 저장
+   - updated_at 자동 갱신 트리거 (students, payments)
+
+### 의사결정 기록
+- 멀티 지점: 별도 DB가 아닌 단일 DB + branch_id 방식 선택 (관리 용이성)
+- RLS: 현재 비활성화, 지점별 데이터 격리 필요 시 추후 추가
+- 시드 데이터: level_test_configs만 (테스트 주기 기본값)
+
+### 기술 스택
+- Supabase (PostgreSQL), SQL migration

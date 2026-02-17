@@ -14,16 +14,10 @@ import { Plus } from "lucide-react"
 import StudentsTable from "./students-table"
 import StudentDetailModal from "./detail/index"
 import AddStudentModal from "./add-student-modal"
-import type { ClassType, StudentFormData, StudentSchedule, StudentStatus } from "@/types/student"
-
-// 임시 더미 데이터 - 나중에 Supabase에서 가져올 예정
-const DUMMY_CLASS_TYPES: ClassType[] = [
-  { id: 1, category: "성인 주 2회", sessions_per_week: 2 },
-  { id: 2, category: "성인 주 3회", sessions_per_week: 3 },
-  { id: 3, category: "어린이 주 2회", sessions_per_week: 2 },
-  { id: 4, category: "어린이 주 3회", sessions_per_week: 3 },
-  { id: 5, category: "체험", sessions_per_week: 1 },
-]
+import { createStudent as createStudentApi, updateStudentStatus } from "@/lib/queries"
+import { CATEGORY_OPTIONS } from "@/lib/constants"
+import { calculateGrade, formatClassName, formatClassTime } from "@/lib/utils/student"
+import type { StudentFormData, StudentSchedule, StudentStatus, StudentListItem } from "@/types/student"
 
 const STATUS_OPTIONS: { value: StudentStatus | "all"; label: string }[] = [
   { value: "all", label: "전체" },
@@ -37,32 +31,27 @@ export default function StudentsClient({
   students: initialStudents,
   initialQuery = ""
 }: {
-  students: any[]
+  students: StudentListItem[]
   initialQuery?: string
 }) {
   const [query, setQuery] = useState(initialQuery)
   const [statusFilter, setStatusFilter] = useState<StudentStatus | "all">("all")
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [students, setStudents] = useState(initialStudents)
 
   // 필터링 결과 메모이제이션
   const filtered = useMemo(() => {
     return students.filter(s => {
-      // 검색어 필터
       const matchesQuery =
         s.name?.toLowerCase().includes(query.toLowerCase()) ||
         s.phone?.includes(query)
-
-      // 상태 필터
       const matchesStatus = statusFilter === "all" || s.status === statusFilter
-
       return matchesQuery && matchesStatus
     })
   }, [students, query, statusFilter])
 
-  // 콜백 메모이제이션
-  const handleRowClick = useCallback((id: number) => {
+  const handleRowClick = useCallback((id: string) => {
     setSelectedId(id)
   }, [])
 
@@ -78,31 +67,36 @@ export default function StudentsClient({
     setIsAddModalOpen(false)
   }, [])
 
-  const handleStudentSaved = useCallback((formData: StudentFormData, schedules: StudentSchedule[]) => {
-    const newStudent = {
-      id: Date.now(),
-      name: formData.name,
-      phone: formData.phone,
-      status: formData.status,
-      birth_date: formData.birth_date,
-      gender: formData.gender,
-      shoe_size: formData.shoe_size,
-      class_type_id: parseInt(formData.class_type_id),
-      schedules,
+  const handleStudentSaved = useCallback(async (formData: StudentFormData, schedules: StudentSchedule[]) => {
+    const created = await createStudentApi(formData, schedules)
+    if (created) {
+      const newListItem: StudentListItem = {
+        id: created.id,
+        name: created.name,
+        gender: created.gender,
+        grade: calculateGrade(created.birth_date),
+        level: created.current_level || '',
+        className: formatClassName(created.category, created.sessions_per_week),
+        classTime: formatClassTime(created.schedules),
+        phone: created.phone,
+        lastPayment: '',
+        paymentAmount: '',
+        status: created.status,
+      }
+      setStudents((prev) => [newListItem, ...prev])
     }
-    setStudents((prev) => [newStudent, ...prev])
   }, [])
 
   // 학생 상태 변경 핸들러
-  const handleStudentStatusChange = useCallback((studentId: number, newStatus: StudentStatus) => {
+  const handleStudentStatusChange = useCallback(async (studentId: string, newStatus: StudentStatus) => {
     setStudents((prev) =>
       prev.map((s) => (s.id === studentId ? { ...s, status: newStatus } : s))
     )
+    await updateStudentStatus(studentId, newStatus)
   }, [])
 
   const isDetailOpen = selectedId !== null
 
-  // 현재 선택된 학생 정보
   const selectedStudent = useMemo(() => {
     return students.find(s => s.id === selectedId) || null
   }, [students, selectedId])
@@ -158,7 +152,6 @@ export default function StudentsClient({
         isOpen={isAddModalOpen}
         onClose={handleAddModalClose}
         onSaved={handleStudentSaved}
-        classTypes={DUMMY_CLASS_TYPES}
       />
     </>
   )

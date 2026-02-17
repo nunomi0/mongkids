@@ -18,6 +18,7 @@ import {
   SelectItem,
 } from "@/components/ui/select"
 import { Users, Sparkles } from "lucide-react"
+import { createClass } from "@/lib/queries"
 import type { ClassItem, GroupType } from "@/types/student"
 
 const REGULAR_GROUP_TYPES: GroupType[] = ["일반1", "일반2", "스페셜"]
@@ -47,19 +48,15 @@ export default function AddClassModal({ isOpen, onClose, date, time, onAddClass,
     onClose()
   }
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!category) return
     const finalGroupType: GroupType = category === "체험" ? "체험" : (groupType as GroupType)
     if (category === "일반" && !groupType) return
 
-    const newClass: ClassItem = {
-      class_id: Date.now(),
-      date,
-      time,
-      group_type: finalGroupType,
-      students: [],
+    const created = await createClass({ date, time, group_type: finalGroupType })
+    if (created) {
+      onAddClass(created)
     }
-    onAddClass(newClass)
     handleClose()
   }
 

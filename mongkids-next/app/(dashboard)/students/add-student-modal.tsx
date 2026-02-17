@@ -19,10 +19,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Plus, Trash2 } from "lucide-react"
+import { CATEGORY_OPTIONS } from "@/lib/constants"
 import type {
   StudentFormData,
   StudentSchedule,
-  ClassType,
+  CategoryType,
   Gender,
   StudentStatus,
   GroupType,
@@ -51,7 +52,7 @@ type FormErrors = {
   name?: string
   birth_date?: string
   phone?: string
-  class_type_id?: string
+  category?: string
   schedules?: string
 }
 
@@ -59,7 +60,8 @@ const initialFormData: StudentFormData = {
   name: "",
   birth_date: "",
   phone: "",
-  class_type_id: "",
+  category: "어린이",
+  sessions_per_week: 2,
   gender: "남",
   status: "재원",
   shoe_size: "",
@@ -69,14 +71,12 @@ type Props = {
   isOpen: boolean
   onClose: () => void
   onSaved: (data: StudentFormData, schedules: StudentSchedule[]) => void
-  classTypes: ClassType[]
 }
 
 export default function AddStudentModal({
   isOpen,
   onClose,
   onSaved,
-  classTypes,
 }: Props) {
   const [formData, setFormData] = useState<StudentFormData>(initialFormData)
   const [schedules, setSchedules] = useState<StudentSchedule[]>([])
@@ -93,7 +93,7 @@ export default function AddStudentModal({
     onClose()
   }, [resetForm, onClose])
 
-  const handleInputChange = (field: keyof StudentFormData, value: string) => {
+  const handleInputChange = (field: keyof StudentFormData, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
     if (errors[field as keyof FormErrors]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }))
@@ -127,10 +127,6 @@ export default function AddStudentModal({
     }
   }
 
-  const getSelectedClassType = () => {
-    return classTypes.find((ct) => ct.id.toString() === formData.class_type_id)
-  }
-
   const hasDuplicateSchedules = () => {
     const seen = new Set<string>()
     for (const s of schedules) {
@@ -156,18 +152,13 @@ export default function AddStudentModal({
       newErrors.phone = "전화번호를 입력하세요"
     }
 
-    if (!formData.class_type_id) {
-      newErrors.class_type_id = "등록반을 선택하세요"
+    if (!formData.category) {
+      newErrors.category = "등록반을 선택하세요"
     }
 
-    const selectedClassType = getSelectedClassType()
-    if (selectedClassType) {
-      if (schedules.length !== selectedClassType.sessions_per_week) {
-        newErrors.schedules = `${selectedClassType.category}은(는) 주 ${selectedClassType.sessions_per_week}회 수업입니다. 현재 ${schedules.length}개 등록됨`
-      } else if (hasDuplicateSchedules()) {
-        newErrors.schedules = "중복된 수업 시간이 있습니다"
-      }
-    } else if (schedules.length > 0 && hasDuplicateSchedules()) {
+    if (schedules.length !== formData.sessions_per_week) {
+      newErrors.schedules = `${formData.category} 주 ${formData.sessions_per_week}회 수업입니다. 현재 ${schedules.length}개 등록됨`
+    } else if (hasDuplicateSchedules()) {
       newErrors.schedules = "중복된 수업 시간이 있습니다"
     }
 
@@ -190,9 +181,7 @@ export default function AddStudentModal({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* 기본 정보 그리드 */}
           <div className="grid grid-cols-2 gap-4">
-            {/* 이름 */}
             <div className="space-y-2">
               <Label htmlFor="name">
                 이름 <span className="text-red-500">*</span>
@@ -203,12 +192,9 @@ export default function AddStudentModal({
                 onChange={(e) => handleInputChange("name", e.target.value)}
                 placeholder="홍길동"
               />
-              {errors.name && (
-                <p className="text-sm text-red-500">{errors.name}</p>
-              )}
+              {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
             </div>
 
-            {/* 생년월일 */}
             <div className="space-y-2">
               <Label htmlFor="birth_date">
                 생년월일 <span className="text-red-500">*</span>
@@ -219,32 +205,19 @@ export default function AddStudentModal({
                 value={formData.birth_date}
                 onChange={(e) => handleInputChange("birth_date", e.target.value)}
               />
-              {errors.birth_date && (
-                <p className="text-sm text-red-500">{errors.birth_date}</p>
-              )}
+              {errors.birth_date && <p className="text-sm text-red-500">{errors.birth_date}</p>}
             </div>
 
-            {/* 성별 */}
             <div className="space-y-2">
               <Label>성별</Label>
-              <Select
-                value={formData.gender}
-                onValueChange={(v) => handleInputChange("gender", v)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={formData.gender} onValueChange={(v) => handleInputChange("gender", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {GENDERS.map((g) => (
-                    <SelectItem key={g} value={g}>
-                      {g}
-                    </SelectItem>
-                  ))}
+                  {GENDERS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* 전화번호 */}
             <div className="space-y-2">
               <Label htmlFor="phone">
                 전화번호 <span className="text-red-500">*</span>
@@ -255,32 +228,19 @@ export default function AddStudentModal({
                 onChange={(e) => handleInputChange("phone", e.target.value)}
                 placeholder="010-1234-5678"
               />
-              {errors.phone && (
-                <p className="text-sm text-red-500">{errors.phone}</p>
-              )}
+              {errors.phone && <p className="text-sm text-red-500">{errors.phone}</p>}
             </div>
 
-            {/* 상태 */}
             <div className="space-y-2">
               <Label>상태</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(v) => handleInputChange("status", v)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={formData.status} onValueChange={(v) => handleInputChange("status", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
+                  {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* 신발 사이즈 */}
             <div className="space-y-2">
               <Label htmlFor="shoe_size">신발 사이즈</Label>
               <Input
@@ -291,118 +251,75 @@ export default function AddStudentModal({
               />
             </div>
 
-            {/* 등록반 - 전체 너비 */}
-            <div className="col-span-2 space-y-2">
+            {/* 등록반 (category + sessions_per_week) */}
+            <div className="space-y-2">
               <Label>
                 등록반 <span className="text-red-500">*</span>
               </Label>
               <Select
-                value={formData.class_type_id}
-                onValueChange={(v) => handleInputChange("class_type_id", v)}
+                value={formData.category}
+                onValueChange={(v) => handleInputChange("category", v)}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="등록반 선택" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="등록반 선택" /></SelectTrigger>
                 <SelectContent>
-                  {classTypes.map((ct) => (
-                    <SelectItem key={ct.id} value={ct.id.toString()}>
-                      {ct.category} (주 {ct.sessions_per_week}회)
-                    </SelectItem>
+                  {CATEGORY_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {errors.class_type_id && (
-                <p className="text-sm text-red-500">{errors.class_type_id}</p>
-              )}
+              {errors.category && <p className="text-sm text-red-500">{errors.category}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label>주 횟수</Label>
+              <Select
+                value={formData.sessions_per_week.toString()}
+                onValueChange={(v) => handleInputChange("sessions_per_week", parseInt(v))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">주 1회</SelectItem>
+                  <SelectItem value="2">주 2회</SelectItem>
+                  <SelectItem value="3">주 3회</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          {/* 수업 시간 섹션 */}
+          {/* 수업 시간 */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label>수업 시간</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addSchedule}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                시간 추가
+              <Button type="button" variant="outline" size="sm" onClick={addSchedule}>
+                <Plus className="h-4 w-4 mr-1" />시간 추가
               </Button>
             </div>
 
             {schedules.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                수업 시간을 추가해주세요
-              </p>
+              <p className="text-sm text-muted-foreground">수업 시간을 추가해주세요</p>
             ) : (
               <div className="space-y-2">
                 {schedules.map((schedule, index) => (
                   <div key={index} className="flex items-center gap-2 w-full">
-                    {/* 요일 */}
-                    <Select
-                      value={schedule.weekday.toString()}
-                      onValueChange={(v) =>
-                        updateSchedule(index, "weekday", parseInt(v))
-                      }
-                    >
-                      <SelectTrigger className="flex-1 min-w-0">
-                        <SelectValue />
-                      </SelectTrigger>
+                    <Select value={schedule.weekday.toString()} onValueChange={(v) => updateSchedule(index, "weekday", parseInt(v))}>
+                      <SelectTrigger className="flex-1 min-w-0"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {WEEKDAYS.map((d) => (
-                          <SelectItem key={d.value} value={d.value.toString()}>
-                            {d.label}
-                          </SelectItem>
-                        ))}
+                        {WEEKDAYS.map((d) => <SelectItem key={d.value} value={d.value.toString()}>{d.label}</SelectItem>)}
                       </SelectContent>
                     </Select>
-
-                    {/* 시간 */}
-                    <Select
-                      value={schedule.time}
-                      onValueChange={(v) => updateSchedule(index, "time", v)}
-                    >
-                      <SelectTrigger className="flex-1 min-w-0">
-                        <SelectValue />
-                      </SelectTrigger>
+                    <Select value={schedule.time} onValueChange={(v) => updateSchedule(index, "time", v)}>
+                      <SelectTrigger className="flex-1 min-w-0"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {TIMES.map((t) => (
-                          <SelectItem key={t} value={t}>
-                            {t}
-                          </SelectItem>
-                        ))}
+                        {TIMES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                       </SelectContent>
                     </Select>
-
-                    {/* 그룹 타입 */}
-                    <Select
-                      value={schedule.group_type}
-                      onValueChange={(v) =>
-                        updateSchedule(index, "group_type", v)
-                      }
-                    >
-                      <SelectTrigger className="flex-1 min-w-0">
-                        <SelectValue />
-                      </SelectTrigger>
+                    <Select value={schedule.group_type} onValueChange={(v) => updateSchedule(index, "group_type", v)}>
+                      <SelectTrigger className="flex-1 min-w-0"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {GROUP_TYPES.map((g) => (
-                          <SelectItem key={g} value={g}>
-                            {g}
-                          </SelectItem>
-                        ))}
+                        {GROUP_TYPES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
                       </SelectContent>
                     </Select>
-
-                    {/* 삭제 버튼 */}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="shrink-0"
-                      onClick={() => removeSchedule(index)}
-                    >
+                    <Button type="button" variant="ghost" size="icon" className="shrink-0" onClick={() => removeSchedule(index)}>
                       <Trash2 className="h-4 w-4 text-muted-foreground" />
                     </Button>
                   </div>
@@ -410,16 +327,12 @@ export default function AddStudentModal({
               </div>
             )}
 
-            {errors.schedules && (
-              <p className="text-sm text-red-500">{errors.schedules}</p>
-            )}
+            {errors.schedules && <p className="text-sm text-red-500">{errors.schedules}</p>}
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
-            취소
-          </Button>
+          <Button variant="outline" onClick={handleClose}>취소</Button>
           <Button onClick={handleSubmit}>추가</Button>
         </DialogFooter>
       </DialogContent>

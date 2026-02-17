@@ -1,24 +1,22 @@
 export type StudentStatus = '재원' | '휴원' | '퇴원' | '체험'
 export type GroupType = '일반1' | '일반2' | '스페셜' | '체험'
 export type Gender = '남' | '여'
+export type CategoryType = '스페셜' | '어린이' | '청소년' | '성인'
 
 export type StudentSchedule = {
+  id?: string
+  student_id?: string
   weekday: number
   time: string
   group_type: GroupType
-}
-
-export type ClassType = {
-  id: number
-  category: string
-  sessions_per_week: number
 }
 
 export type StudentFormData = {
   name: string
   birth_date: string
   phone: string
-  class_type_id: string
+  category: CategoryType
+  sessions_per_week: number
   gender: Gender
   status: StudentStatus
   shoe_size: string
@@ -41,21 +39,24 @@ export type PaymentFormData = {
 }
 
 export type Student = {
-  id: number
+  id: string
+  branch_id: string
   name: string
   birth_date: string
   phone: string
-  class_type_id: number
+  category: CategoryType
+  sessions_per_week: number
   gender: Gender
   status: StudentStatus
   shoe_size: string
+  current_level: LevelType | null
   memo: string
   schedules: StudentSchedule[]
 }
 
 export type Payment = {
-  id: number
-  student_id: number
+  id: string
+  student_id: string
   payment_date: string
   target_month: string
   amount: number
@@ -72,11 +73,10 @@ export type LevelHistory = {
 }
 
 // 수업 관리 타입
-export type AttendanceStatus = '예정' | '출석' | '결석'
-export type AttendanceKind = '정규' | '보강'
+export type AttendanceStatus = '예정' | '출석' | '결석' | '보강예정' | '보강완료'
 
 export type ClassItem = {
-  class_id: number
+  id: string
   date: string
   time: string
   group_type: GroupType
@@ -84,7 +84,7 @@ export type ClassItem = {
 }
 
 export type ClassStudent = {
-  id: number
+  id: string
   name: string
   grade: string
   level: LevelType | ''
@@ -92,40 +92,43 @@ export type ClassStudent = {
 }
 
 export type AttendanceRecord = {
-  id: number
-  student_id: number
-  class_id: number
-  date: string
+  id: string
+  student_id: string
+  class_id: string
   status: AttendanceStatus
-  kind: AttendanceKind
-  makeup_of_attendance_id: number | null
-  note: string | null
+  makeup_of_attendance_id: string | null
+  memo: string
 }
 
 // 체험 관리 타입
 export type TrialStatus = '예정' | '노쇼' | '미등록' | '등록'
 
 export type TrialReservation = {
-  id: number
+  id: string
+  branch_id: string
   name: string
   phone: string
   gender: Gender | ''
   grade: string
   status: TrialStatus
+  class_id: string | null
   trial_date: string
   trial_time: string
   note: string
   created_at: string
 }
 
-export type DisplayStatus =
-  | 'REGULAR_PLANNED'
-  | 'REGULAR_PRESENT'
-  | 'REGULAR_ABSENT'
-  | 'REGULAR_MAKEUP_PLANNED'
-  | 'REGULAR_MAKEUP_PRESENT'
-  | 'REGULAR_MAKEUP_ABSENT'
-  | 'MAKEUP_PLANNED'
-  | 'MAKEUP_PRESENT'
-  | 'MAKEUP_ABSENT'
-  | 'NONE'
+// 학생 목록 표시용 타입
+export type StudentListItem = {
+  id: string
+  name: string
+  gender: Gender
+  grade: string
+  level: LevelType | ''
+  className: string
+  classTime: string
+  phone: string
+  lastPayment: string
+  paymentAmount: string
+  status: StudentStatus
+}

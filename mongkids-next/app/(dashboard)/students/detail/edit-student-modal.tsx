@@ -19,13 +19,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Plus, Trash2 } from "lucide-react"
+import { CATEGORY_OPTIONS } from "@/lib/constants"
 import type {
   Student,
   StudentSchedule,
-  ClassType,
   Gender,
   StudentStatus,
   GroupType,
+  CategoryType,
 } from "@/types/student"
 
 const WEEKDAYS = [
@@ -51,7 +52,7 @@ type FormErrors = {
   name?: string
   birth_date?: string
   phone?: string
-  class_type_id?: string
+  category?: string
   schedules?: string
 }
 
@@ -60,7 +61,6 @@ type Props = {
   onClose: () => void
   onSaved: (student: Student) => void
   student: Student | null
-  classTypes: ClassType[]
 }
 
 export default function EditStudentModal({
@@ -68,16 +68,17 @@ export default function EditStudentModal({
   onClose,
   onSaved,
   student,
-  classTypes,
 }: Props) {
-  const [formData, setFormData] = useState<Omit<Student, "id" | "schedules">>({
+  const [formData, setFormData] = useState<Omit<Student, "id" | "branch_id" | "schedules">>({
     name: "",
     birth_date: "",
     phone: "",
-    class_type_id: 0,
+    category: "어린이",
+    sessions_per_week: 2,
     gender: "남",
     status: "재원",
     shoe_size: "",
+    current_level: null,
     memo: "",
   })
   const [schedules, setSchedules] = useState<StudentSchedule[]>([])
@@ -89,10 +90,12 @@ export default function EditStudentModal({
         name: student.name,
         birth_date: student.birth_date,
         phone: student.phone,
-        class_type_id: student.class_type_id,
+        category: student.category,
+        sessions_per_week: student.sessions_per_week,
         gender: student.gender,
         status: student.status,
         shoe_size: student.shoe_size,
+        current_level: student.current_level,
         memo: student.memo || "",
       })
       setSchedules(student.schedules || [])
@@ -139,10 +142,6 @@ export default function EditStudentModal({
     }
   }
 
-  const getSelectedClassType = () => {
-    return classTypes.find((ct) => ct.id === formData.class_type_id)
-  }
-
   const hasDuplicateSchedules = () => {
     const seen = new Set<string>()
     for (const s of schedules) {
@@ -156,30 +155,14 @@ export default function EditStudentModal({
   const validate = (): boolean => {
     const newErrors: FormErrors = {}
 
-    if (!formData.name.trim()) {
-      newErrors.name = "이름을 입력하세요"
-    }
+    if (!formData.name.trim()) newErrors.name = "이름을 입력하세요"
+    if (!formData.birth_date) newErrors.birth_date = "생년월일을 입력하세요"
+    if (!formData.phone.trim()) newErrors.phone = "전화번호를 입력하세요"
+    if (!formData.category) newErrors.category = "등록반을 선택하세요"
 
-    if (!formData.birth_date) {
-      newErrors.birth_date = "생년월일을 입력하세요"
-    }
-
-    if (!formData.phone.trim()) {
-      newErrors.phone = "전화번호를 입력하세요"
-    }
-
-    if (!formData.class_type_id) {
-      newErrors.class_type_id = "등록반을 선택하세요"
-    }
-
-    const selectedClassType = getSelectedClassType()
-    if (selectedClassType) {
-      if (schedules.length !== selectedClassType.sessions_per_week) {
-        newErrors.schedules = `${selectedClassType.category}은(는) 주 ${selectedClassType.sessions_per_week}회 수업입니다. 현재 ${schedules.length}개 등록됨`
-      } else if (hasDuplicateSchedules()) {
-        newErrors.schedules = "중복된 수업 시간이 있습니다"
-      }
-    } else if (schedules.length > 0 && hasDuplicateSchedules()) {
+    if (schedules.length !== formData.sessions_per_week) {
+      newErrors.schedules = `${formData.category} 주 ${formData.sessions_per_week}회 수업입니다. 현재 ${schedules.length}개 등록됨`
+    } else if (hasDuplicateSchedules()) {
       newErrors.schedules = "중복된 수업 시간이 있습니다"
     }
 
@@ -210,230 +193,102 @@ export default function EditStudentModal({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* 기본 정보 그리드 */}
           <div className="grid grid-cols-2 gap-4">
-            {/* 이름 */}
             <div className="space-y-2">
-              <Label htmlFor="edit-name">
-                이름 <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="edit-name"
-                value={formData.name}
-                onChange={(e) => handleInputChange("name", e.target.value)}
-                placeholder="홍길동"
-              />
-              {errors.name && (
-                <p className="text-sm text-red-500">{errors.name}</p>
-              )}
+              <Label htmlFor="edit-name">이름 <span className="text-red-500">*</span></Label>
+              <Input id="edit-name" value={formData.name} onChange={(e) => handleInputChange("name", e.target.value)} placeholder="홍길동" />
+              {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
             </div>
 
-            {/* 생년월일 */}
             <div className="space-y-2">
-              <Label htmlFor="edit-birth_date">
-                생년월일 <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="edit-birth_date"
-                type="date"
-                value={formData.birth_date}
-                onChange={(e) => handleInputChange("birth_date", e.target.value)}
-              />
-              {errors.birth_date && (
-                <p className="text-sm text-red-500">{errors.birth_date}</p>
-              )}
+              <Label htmlFor="edit-birth_date">생년월일 <span className="text-red-500">*</span></Label>
+              <Input id="edit-birth_date" type="date" value={formData.birth_date} onChange={(e) => handleInputChange("birth_date", e.target.value)} />
+              {errors.birth_date && <p className="text-sm text-red-500">{errors.birth_date}</p>}
             </div>
 
-            {/* 성별 */}
             <div className="space-y-2">
               <Label>성별</Label>
-              <Select
-                value={formData.gender}
-                onValueChange={(v) => handleInputChange("gender", v)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {GENDERS.map((g) => (
-                    <SelectItem key={g} value={g}>
-                      {g}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+              <Select value={formData.gender} onValueChange={(v) => handleInputChange("gender", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{GENDERS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent>
               </Select>
             </div>
 
-            {/* 전화번호 */}
             <div className="space-y-2">
-              <Label htmlFor="edit-phone">
-                전화번호 <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="edit-phone"
-                value={formData.phone}
-                onChange={(e) => handleInputChange("phone", e.target.value)}
-                placeholder="010-1234-5678"
-              />
-              {errors.phone && (
-                <p className="text-sm text-red-500">{errors.phone}</p>
-              )}
+              <Label htmlFor="edit-phone">전화번호 <span className="text-red-500">*</span></Label>
+              <Input id="edit-phone" value={formData.phone} onChange={(e) => handleInputChange("phone", e.target.value)} placeholder="010-1234-5678" />
+              {errors.phone && <p className="text-sm text-red-500">{errors.phone}</p>}
             </div>
 
-            {/* 상태 */}
             <div className="space-y-2">
               <Label>상태</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(v) => handleInputChange("status", v)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+              <Select value={formData.status} onValueChange={(v) => handleInputChange("status", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
             </div>
 
-            {/* 신발 사이즈 */}
             <div className="space-y-2">
               <Label htmlFor="edit-shoe_size">신발 사이즈</Label>
-              <Input
-                id="edit-shoe_size"
-                value={formData.shoe_size}
-                onChange={(e) => handleInputChange("shoe_size", e.target.value)}
-                placeholder="250"
-              />
+              <Input id="edit-shoe_size" value={formData.shoe_size} onChange={(e) => handleInputChange("shoe_size", e.target.value)} placeholder="250" />
             </div>
 
-            {/* 등록반 - 전체 너비 */}
-            <div className="col-span-2 space-y-2">
-              <Label>
-                등록반 <span className="text-red-500">*</span>
-              </Label>
-              <Select
-                value={formData.class_type_id.toString()}
-                onValueChange={(v) => handleInputChange("class_type_id", parseInt(v))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="등록반 선택" />
-                </SelectTrigger>
+            <div className="space-y-2">
+              <Label>등록반 <span className="text-red-500">*</span></Label>
+              <Select value={formData.category} onValueChange={(v) => handleInputChange("category", v)}>
+                <SelectTrigger><SelectValue placeholder="등록반 선택" /></SelectTrigger>
                 <SelectContent>
-                  {classTypes.map((ct) => (
-                    <SelectItem key={ct.id} value={ct.id.toString()}>
-                      {ct.category} (주 {ct.sessions_per_week}회)
-                    </SelectItem>
-                  ))}
+                  {CATEGORY_OPTIONS.map((opt) => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
                 </SelectContent>
               </Select>
-              {errors.class_type_id && (
-                <p className="text-sm text-red-500">{errors.class_type_id}</p>
-              )}
+              {errors.category && <p className="text-sm text-red-500">{errors.category}</p>}
             </div>
 
-            {/* 메모 - 전체 너비 */}
+            <div className="space-y-2">
+              <Label>주 횟수</Label>
+              <Select value={formData.sessions_per_week.toString()} onValueChange={(v) => handleInputChange("sessions_per_week", parseInt(v))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">주 1회</SelectItem>
+                  <SelectItem value="2">주 2회</SelectItem>
+                  <SelectItem value="3">주 3회</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="col-span-2 space-y-2">
               <Label htmlFor="edit-memo">메모</Label>
-              <Input
-                id="edit-memo"
-                value={formData.memo}
-                onChange={(e) => handleInputChange("memo", e.target.value)}
-                placeholder="메모 입력"
-              />
+              <Input id="edit-memo" value={formData.memo} onChange={(e) => handleInputChange("memo", e.target.value)} placeholder="메모 입력" />
             </div>
           </div>
 
-          {/* 수업 시간 섹션 */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label>수업 시간</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addSchedule}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                시간 추가
+              <Button type="button" variant="outline" size="sm" onClick={addSchedule}>
+                <Plus className="h-4 w-4 mr-1" />시간 추가
               </Button>
             </div>
 
             {schedules.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                수업 시간을 추가해주세요
-              </p>
+              <p className="text-sm text-muted-foreground">수업 시간을 추가해주세요</p>
             ) : (
               <div className="space-y-2">
                 {schedules.map((schedule, index) => (
                   <div key={index} className="flex items-center gap-2 w-full">
-                    {/* 요일 */}
-                    <Select
-                      value={schedule.weekday.toString()}
-                      onValueChange={(v) =>
-                        updateSchedule(index, "weekday", parseInt(v))
-                      }
-                    >
-                      <SelectTrigger className="flex-1 min-w-0">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {WEEKDAYS.map((d) => (
-                          <SelectItem key={d.value} value={d.value.toString()}>
-                            {d.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
+                    <Select value={schedule.weekday.toString()} onValueChange={(v) => updateSchedule(index, "weekday", parseInt(v))}>
+                      <SelectTrigger className="flex-1 min-w-0"><SelectValue /></SelectTrigger>
+                      <SelectContent>{WEEKDAYS.map((d) => <SelectItem key={d.value} value={d.value.toString()}>{d.label}</SelectItem>)}</SelectContent>
                     </Select>
-
-                    {/* 시간 */}
-                    <Select
-                      value={schedule.time}
-                      onValueChange={(v) => updateSchedule(index, "time", v)}
-                    >
-                      <SelectTrigger className="flex-1 min-w-0">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {TIMES.map((t) => (
-                          <SelectItem key={t} value={t}>
-                            {t}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
+                    <Select value={schedule.time} onValueChange={(v) => updateSchedule(index, "time", v)}>
+                      <SelectTrigger className="flex-1 min-w-0"><SelectValue /></SelectTrigger>
+                      <SelectContent>{TIMES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                     </Select>
-
-                    {/* 그룹 타입 */}
-                    <Select
-                      value={schedule.group_type}
-                      onValueChange={(v) =>
-                        updateSchedule(index, "group_type", v)
-                      }
-                    >
-                      <SelectTrigger className="flex-1 min-w-0">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {GROUP_TYPES.map((g) => (
-                          <SelectItem key={g} value={g}>
-                            {g}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
+                    <Select value={schedule.group_type} onValueChange={(v) => updateSchedule(index, "group_type", v)}>
+                      <SelectTrigger className="flex-1 min-w-0"><SelectValue /></SelectTrigger>
+                      <SelectContent>{GROUP_TYPES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent>
                     </Select>
-
-                    {/* 삭제 버튼 */}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="shrink-0"
-                      onClick={() => removeSchedule(index)}
-                    >
+                    <Button type="button" variant="ghost" size="icon" className="shrink-0" onClick={() => removeSchedule(index)}>
                       <Trash2 className="h-4 w-4 text-muted-foreground" />
                     </Button>
                   </div>
@@ -441,16 +296,12 @@ export default function EditStudentModal({
               </div>
             )}
 
-            {errors.schedules && (
-              <p className="text-sm text-red-500">{errors.schedules}</p>
-            )}
+            {errors.schedules && <p className="text-sm text-red-500">{errors.schedules}</p>}
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
-            취소
-          </Button>
+          <Button variant="outline" onClick={handleClose}>취소</Button>
           <Button onClick={handleSubmit}>저장</Button>
         </DialogFooter>
       </DialogContent>

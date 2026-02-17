@@ -21,13 +21,13 @@ import {
 import { ArrowLeft, Search, UserPlus, RotateCcw, Clock } from "lucide-react"
 import LevelBadge from "@/components/level-badge"
 import StatusBadge from "@/components/status-badge"
-import type { ClassItem, ClassStudent, AttendanceKind, AttendanceStatus, LevelType, Gender, GroupType, StudentSchedule, StudentStatus } from "@/types/student"
+import type { ClassItem, ClassStudent, AttendanceStatus, LevelType, Gender, GroupType, StudentSchedule, StudentStatus } from "@/types/student"
 
 const WEEKDAY_KR = ["일", "월", "화", "수", "목", "금", "토"]
 
 // 이번 달 출석 기록 타입
 type MonthlyAttendanceItem = {
-  id: number
+  id: string
   date: string
   time: string
   group_type: GroupType
@@ -45,51 +45,51 @@ type SearchableStudent = ClassStudent & {
 
 // 검색용 더미 학생 목록
 const SEARCHABLE_STUDENTS: SearchableStudent[] = [
-  { id: 1, name: "김민준", grade: "초3", level: "GREEN", gender: "남", className: "어린이 주 3회", classTime: "월수 15:00 / 금 16:00", phone: "010-1234-5678", status: "재원" },
-  { id: 2, name: "이서윤", grade: "초4", level: "BLUE", gender: "여", className: "어린이 주 2회", classTime: "화목 16:00", phone: "010-2345-6789", status: "재원" },
-  { id: 3, name: "박지호", grade: "초2", level: "YELLOW", gender: "남", className: "어린이 주 2회", classTime: "월 15:00 / 수 16:00", phone: "010-3456-7890", status: "재원" },
-  { id: 4, name: "최수아", grade: "초5", level: "RED", gender: "여", className: "어린이 주 3회", classTime: "월수금 16:00", phone: "010-4567-8901", status: "재원" },
-  { id: 5, name: "정예준", grade: "초1", level: "WHITE", gender: "남", className: "어린이 주 2회", classTime: "화 15:00 / 목 16:00", phone: "010-5678-9012", status: "재원" },
-  { id: 6, name: "강하늘", grade: "초3", level: "GREEN", gender: "여", className: "어린이 주 3회", classTime: "월수금 17:00", phone: "010-6789-0123", status: "재원" },
-  { id: 7, name: "윤서진", grade: "초6", level: "BLACK", gender: "여", className: "어린이 주 2회", classTime: "화 17:00 / 목 16:00", phone: "010-7890-1234", status: "휴원" },
-  { id: 8, name: "임도윤", grade: "성인", level: "GOLD", gender: "남", className: "성인 주 3회", classTime: "월 19:00 / 수금 20:00", phone: "010-8901-2345", status: "재원" },
+  { id: "1", name: "김민준", grade: "초3", level: "GREEN", gender: "남", className: "어린이 주 3회", classTime: "월수 15:00 / 금 16:00", phone: "010-1234-5678", status: "재원" },
+  { id: "2", name: "이서윤", grade: "초4", level: "BLUE", gender: "여", className: "어린이 주 2회", classTime: "화목 16:00", phone: "010-2345-6789", status: "재원" },
+  { id: "3", name: "박지호", grade: "초2", level: "YELLOW", gender: "남", className: "어린이 주 2회", classTime: "월 15:00 / 수 16:00", phone: "010-3456-7890", status: "재원" },
+  { id: "4", name: "최수아", grade: "초5", level: "RED", gender: "여", className: "어린이 주 3회", classTime: "월수금 16:00", phone: "010-4567-8901", status: "재원" },
+  { id: "5", name: "정예준", grade: "초1", level: "WHITE", gender: "남", className: "어린이 주 2회", classTime: "화 15:00 / 목 16:00", phone: "010-5678-9012", status: "재원" },
+  { id: "6", name: "강하늘", grade: "초3", level: "GREEN", gender: "여", className: "어린이 주 3회", classTime: "월수금 17:00", phone: "010-6789-0123", status: "재원" },
+  { id: "7", name: "윤서진", grade: "초6", level: "BLACK", gender: "여", className: "어린이 주 2회", classTime: "화 17:00 / 목 16:00", phone: "010-7890-1234", status: "휴원" },
+  { id: "8", name: "임도윤", grade: "성인", level: "GOLD", gender: "남", className: "성인 주 3회", classTime: "월 19:00 / 수금 20:00", phone: "010-8901-2345", status: "재원" },
 ]
 
 // 학생별 정규 수업 스케줄 (보강 시 원래 수업 선택용)
-const STUDENT_SCHEDULES: Record<number, StudentSchedule[]> = {
-  1: [
+const STUDENT_SCHEDULES: Record<string, StudentSchedule[]> = {
+  "1": [
     { weekday: 1, time: "15:00", group_type: "일반1" },
     { weekday: 3, time: "15:00", group_type: "일반1" },
     { weekday: 5, time: "15:00", group_type: "일반1" },
   ],
-  2: [
+  "2": [
     { weekday: 2, time: "16:00", group_type: "일반2" },
     { weekday: 4, time: "16:00", group_type: "일반2" },
   ],
-  3: [
+  "3": [
     { weekday: 1, time: "16:00", group_type: "일반1" },
     { weekday: 3, time: "16:00", group_type: "일반1" },
     { weekday: 5, time: "16:00", group_type: "일반1" },
   ],
-  4: [
+  "4": [
     { weekday: 2, time: "17:00", group_type: "스페셜" },
     { weekday: 4, time: "17:00", group_type: "스페셜" },
   ],
-  5: [
+  "5": [
     { weekday: 1, time: "15:00", group_type: "일반2" },
     { weekday: 3, time: "15:00", group_type: "일반2" },
   ],
-  6: [
+  "6": [
     { weekday: 2, time: "15:00", group_type: "일반1" },
     { weekday: 4, time: "15:00", group_type: "일반1" },
     { weekday: 6, time: "15:00", group_type: "일반1" },
   ],
-  7: [
+  "7": [
     { weekday: 1, time: "17:00", group_type: "스페셜" },
     { weekday: 3, time: "17:00", group_type: "스페셜" },
     { weekday: 5, time: "17:00", group_type: "스페셜" },
   ],
-  8: [
+  "8": [
     { weekday: 2, time: "17:00", group_type: "일반2" },
     { weekday: 4, time: "17:00", group_type: "일반2" },
   ],
@@ -102,16 +102,17 @@ function seededRand(seed: number): number {
 }
 
 // 학생의 이번 달 출석 기록 생성
-function generateMonthlyAttendance(studentId: number): MonthlyAttendanceItem[] {
+function generateMonthlyAttendance(studentId: string): MonthlyAttendanceItem[] {
   const schedules = STUDENT_SCHEDULES[studentId]
   if (!schedules || schedules.length === 0) return []
 
+  const idNum = parseInt(studentId) || 0
   const now = new Date()
   const year = now.getFullYear()
   const month = now.getMonth()
   const today = now.getDate()
   const items: MonthlyAttendanceItem[] = []
-  let attId = studentId * 10000
+  let attId = idNum * 10000
 
   // 이번 달 1일부터 말일까지
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -130,12 +131,12 @@ function generateMonthlyAttendance(studentId: number): MonthlyAttendanceItem[] {
         status = "예정"
       } else {
         // 시드 기반으로 출석/결석 결정 (약 20%가 결석)
-        const r = seededRand(studentId * 100 + day * 7 + schedule.weekday)
+        const r = seededRand(idNum * 100 + day * 7 + schedule.weekday)
         status = r < 0.2 ? "결석" : "출석"
       }
 
       items.push({
-        id: attId++,
+        id: String(attId++),
         date: dateStr,
         time: schedule.time,
         group_type: schedule.group_type,
@@ -151,7 +152,8 @@ type Props = {
   isOpen: boolean
   onClose: () => void
   classItem: ClassItem
-  onAddStudent: (student: ClassStudent, kind: AttendanceKind, makeupOfAttendanceId?: number) => void
+  onAddStudent?: (student: ClassStudent, kind: "정규" | "보강", makeupOfAttendanceId?: string) => void
+  onStudentAdded?: () => void
   classGroupType?: GroupType
 }
 
@@ -159,7 +161,7 @@ type Props = {
 // 체험 수업 플로우: trial-form
 type Step = "search" | "select-kind" | "select-class" | "trial-form"
 
-export default function AddClassStudentModal({ isOpen, onClose, classItem, onAddStudent, classGroupType }: Props) {
+export default function AddClassStudentModal({ isOpen, onClose, classItem, onAddStudent, onStudentAdded, classGroupType }: Props) {
   const isTrial = classGroupType === "체험"
 
   const [step, setStep] = useState<Step>(isTrial ? "trial-form" : "search")
@@ -225,7 +227,8 @@ export default function AddClassStudentModal({ isOpen, onClose, classItem, onAdd
       grade: selectedStudent.grade,
       level: selectedStudent.level,
     }
-    onAddStudent(classStudent, kind)
+    onAddStudent?.(classStudent, kind)
+    onStudentAdded?.()
     handleClose()
   }
 
@@ -238,7 +241,8 @@ export default function AddClassStudentModal({ isOpen, onClose, classItem, onAdd
       grade: selectedStudent.grade,
       level: selectedStudent.level,
     }
-    onAddStudent(classStudent, "보강", attendance.id)
+    onAddStudent?.(classStudent, "보강", attendance.id)
+    onStudentAdded?.()
     handleClose()
   }
 
@@ -252,13 +256,14 @@ export default function AddClassStudentModal({ isOpen, onClose, classItem, onAdd
   const handleConfirmTrial = () => {
     if (!trialName.trim()) return
     const classStudent: ClassStudent = {
-      id: Date.now(),
+      id: String(Date.now()),
       name: trialName.trim(),
       grade: trialGrade || "-",
       level: "",
       isTrial: true,
     }
-    onAddStudent(classStudent, "정규")
+    onAddStudent?.(classStudent, "정규")
+    onStudentAdded?.()
     handleClose()
   }
 
@@ -414,7 +419,6 @@ export default function AddClassStudentModal({ isOpen, onClose, classItem, onAdd
                   const weekdayLabel = WEEKDAY_KR[d.getDay()]
                   const isAbsent = att.status === "결석"
                   const isPresent = att.status === "출석"
-                  const isPending = att.status === "예정"
 
                   return (
                     <div

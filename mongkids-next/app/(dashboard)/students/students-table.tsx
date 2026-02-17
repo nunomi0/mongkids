@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import StatusBadge from "@/components/status-badge"
+import LevelBadge, { type LevelValue } from "@/components/level-badge"
 import type { StudentStatus } from "@/types/student"
 
 const columns = [
@@ -18,12 +19,14 @@ const columns = [
   { key: "className", label: "등록반", className: "" },
   { key: "classTime", label: "수업 시간", className: "" },
   { key: "phone", label: "전화번호", className: "w-32 whitespace-nowrap" },
-  { key: "lastPayment", label: "최근 결제", className: "" },
+  { key: "lastPayment", label: "최근 결제", className: "w-24" },
   { key: "paymentAmount", label: "결제금액", className: "" },
   { key: "status", label: "상태", className: "w-16" },
 ]
 
-function StudentsTable({ students, onRowClick }: { students: any[], onRowClick: (id: number) => void }) {
+const LEVEL_VALUES: string[] = ["WHITE", "YELLOW", "GREEN", "BLUE", "RED", "BLACK", "GOLD"]
+
+function StudentsTable({ students, onRowClick }: { students: any[], onRowClick: (id: string) => void }) {
   return (
     <div className="w-full overflow-x-auto">
       <Table className="w-full min-w-full">
@@ -49,6 +52,11 @@ function StudentsTable({ students, onRowClick }: { students: any[], onRowClick: 
                 >
                   {col.key === "status" && s.status ? (
                     <StatusBadge status={s.status as StudentStatus} />
+                  ) : col.key === "level" && s.level && LEVEL_VALUES.includes(s.level) ? (
+                    <div className="flex items-center gap-1.5">
+                      <LevelBadge level={s.level as LevelValue} size={12} radius={2} />
+                      <span className="text-xs">{s.level}</span>
+                    </div>
                   ) : (
                     s[col.key]
                   )}
