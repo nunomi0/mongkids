@@ -4,6 +4,42 @@
 
 ---
 
+## [2026-02-17] 세션 4: Supabase 연동 완료 — 모든 더미 데이터 제거
+
+### 작업 내용
+
+1. **타입 에러 일괄 수정 (37개)**
+   - 이전 세션에서 변경한 타입(`AttendanceKind` 제거, `id: number→string`, `AttendanceRecord` 구조 변경)에 맞게 모든 컴포넌트 업데이트
+   - `TrialReservation`에 `trial_date`/`trial_time` 필드 추가 (classes 테이블 조인으로 제공)
+   - `fetchTrials`에 classes 테이블 조인 추가
+
+2. **학생 추가 모달(`add-class-student-modal.tsx`) Supabase 연동**
+   - `SEARCHABLE_STUDENTS` (하드코딩 8명) → `fetchSearchableStudents()` API 호출
+   - `STUDENT_SCHEDULES` + `generateMonthlyAttendance()` → `fetchMonthlyAttendance()` API 호출
+   - 정규/보강 추가 시 `upsertAttendance()`로 출석 레코드 DB 생성
+
+3. **주차별 수업 페이지(`weekly/page.tsx`) Supabase 연동**
+   - `DUMMY_STUDENTS` + `generateWeekClasses()` 완전 제거
+   - `fetchClassesByWeek()` → attendanceMap 포함 반환하도록 확장 (daily 패턴과 동일)
+   - 출석 토글/전체 출석/메모 모두 API 연동 (`upsertAttendance`, `markAllPresent`, `updateAttendanceMemo`)
+   - 로딩 상태 + 빈 주 상태 UI 추가
+
+4. **`fetchClassesByWeek` 쿼리 개선**
+   - 기존: `ClassItem[]` 반환 (학생 목록만)
+   - 변경: `{ classes, attendanceMap }` 반환 (출석 상태 + 메모 포함)
+
+### 의사결정
+
+- 주차별/일별 페이지 모두 동일한 패턴(fetchData → classes + attendanceMap → 로컬 state → API 호출)으로 통일
+- 체험 학생 등록은 아직 로컬 추가만 수행 (students 테이블 연동은 추후)
+
+### 결과
+
+- **더미 데이터 사용 컴포넌트: 0개** (전체 Supabase 연동 완료)
+- 타입 에러 0개, 빌드 성공
+
+---
+
 ## [2026-02-11] 세션 1: 수업/체험 관리 기능 개선 및 체험 관리 구현
 
 ### 작업 내용

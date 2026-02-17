@@ -115,10 +115,19 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS + shadcn/ui 기�
 - 결제 할인: payments.discounts JSONB 배열
 - updated_at 자동 갱신 트리거 (students, payments)
 
+### 6.3 Supabase 연동 현황 (전체 완료)
+- `lib/supabase.ts` — Supabase 클라이언트
+- `lib/queries.ts` — 모든 CRUD 쿼리 함수 (학생/결제/출석/수업/체험)
+- `lib/utils/student.ts` — 학년 계산, 반 이름 포맷 등 유틸
+- **학생 관리**: 목록 조회, 상세 조회, 등록, 수정, 상태 변경, 결제/출석/레벨 CRUD
+- **일별 수업**: 수업 목록 + 출석 조회, 출석 토글, 전체 출석, 메모 수정
+- **주차별 수업**: 주간 수업 + 출석 조회, 출석 토글, 전체 출석, 메모 수정
+- **학생 추가 모달**: 학생 검색, 월별 출석 조회, 출석 레코드 생성 (정규/보강)
+- **체험 관리**: 예약 목록 조회 (classes 조인), 등록, 수정, 삭제
+
 ---
 
 ## 7. 미구현 / 예정 기능
-- Supabase 연동 코드 (현재 더미 데이터)
 - 인증/로그인
 - 메인 대시보드 콘텐츠
-- 수업별 학생 메모 기능
+- 체험 학생 등록 시 students 테이블 연동
