@@ -32,9 +32,16 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }
   보강완료: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-300" },
 }
 
+// 그룹 타입별 행 오버라이드 스타일
+const GROUP_ROW_STYLES: Partial<Record<string, { bg: string; text: string; border: string }>> = {
+  "체험": { bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200" },
+  "스페셜": { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" },
+}
+
 function StudentRow({
   student,
   status,
+  groupType,
   memo: memoText,
   isExpanded,
   onToggle,
@@ -44,6 +51,7 @@ function StudentRow({
 }: {
   student: ClassStudent
   status: AttendanceStatus
+  groupType: string
   memo: string
   isExpanded: boolean
   onToggle: () => void
@@ -51,7 +59,7 @@ function StudentRow({
   onMemoToggle: () => void
   onMemoChange: (value: string) => void
 }) {
-  const style = STATUS_STYLES[status] || STATUS_STYLES["예정"]
+  const style = (student.isTrial ? GROUP_ROW_STYLES["체험"] : GROUP_ROW_STYLES[groupType]) ?? (STATUS_STYLES[status] || STATUS_STYLES["예정"])
   const hasMemo = !!memoText.trim()
 
   return (
@@ -160,14 +168,12 @@ function ClassDetailCard({ classItem, attendanceMap, memoMap = {}, onToggleAtten
     })
   }, [storageKey])
 
-  // 출석 통계
+  // 전체 출석 버튼 표시 여부 확인
   let present = 0
-  let absent = 0
   for (const st of students) {
     const key = `${date}-${id}-${st.id}`
     const record = attendanceMap[key]
     if (record?.status === "출석") present++
-    else if (record?.status === "결석") absent++
   }
 
   const groupStyle = GROUP_CARD_STYLES[group_type] || DEFAULT_CARD_STYLE
@@ -181,8 +187,6 @@ function ClassDetailCard({ classItem, attendanceMap, memoMap = {}, onToggleAtten
           </CardTitle>
           <div className="flex items-center gap-2 text-xs">
             <span className="text-muted-foreground">{students.length}명</span>
-            {present > 0 && <span className="text-green-600">출석 {present}</span>}
-            {absent > 0 && <span className="text-red-600">결석 {absent}</span>}
             {onMarkAllPresent && students.length > 0 && present < students.length && (
               <Button
                 variant="ghost"
@@ -217,6 +221,7 @@ function ClassDetailCard({ classItem, attendanceMap, memoMap = {}, onToggleAtten
                 key={st.id}
                 student={st}
                 status={status}
+                groupType={group_type}
                 memo={memoMap[memoKey] ?? ""}
                 isExpanded={expandedMemos.has(st.id)}
                 onToggle={() => onToggleAttendance(st.id, id)}

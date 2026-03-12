@@ -1,4 +1,4 @@
-import { Home, BookOpen, Users, UserPlus } from "lucide-react"
+import { Home, BookOpen, Users, UserPlus, Database } from "lucide-react"
 import Link from "next/link"
 
 import {
@@ -44,6 +44,11 @@ const items = [
     title: "체험 관리",
     url: "/trials",
     icon: UserPlus,
+  },
+  {
+    title: "데이터 관리",
+    url: "/settings",
+    icon: Database,
   }
 ]
 

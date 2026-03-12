@@ -15,8 +15,14 @@ import { Plus, Users, Check, X, Clock, Ban } from "lucide-react"
 import TrialsTable from "./trials-table"
 import AddTrialModal from "./add-trial-modal"
 import TrialDetailModal from "./trial-detail-modal"
-import { createTrial, updateTrial as updateTrialApi, deleteTrial as deleteTrialApi } from "@/lib/queries"
-import type { TrialReservation, TrialStatus } from "@/types/student"
+import AddStudentModal from "../students/add-student-modal"
+import {
+  createTrial,
+  updateTrial as updateTrialApi,
+  deleteTrial as deleteTrialApi,
+  createStudent as createStudentApi,
+} from "@/lib/queries"
+import type { TrialReservation, TrialStatus, StudentFormData, StudentSchedule, CategoryType } from "@/types/student"
 
 type StatusFilterValue = TrialStatus | "all"
 
@@ -38,6 +44,15 @@ export default function TrialsClient({
   const [statusFilter, setStatusFilter] = useState<StatusFilterValue>("all")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
+  const [isStudentAddOpen, setIsStudentAddOpen] = useState(false)
+  const [studentDraft, setStudentDraft] = useState<Partial<StudentFormData> | null>(null)
+
+  const getCategoryFromGrade = useCallback((grade: string): CategoryType => {
+    if (!grade) return "어린이"
+    if (grade.includes("중") || grade.includes("고")) return "청소년"
+    if (grade.includes("세") || grade.includes("초")) return "어린이"
+    return "성인"
+  }, [])
 
   // 필터링
   const filtered = useMemo(() => {
@@ -83,6 +98,17 @@ export default function TrialsClient({
     await updateTrialApi(updated)
   }, [])
 
+  const handleRegistered = useCallback((registeredTrial: TrialReservation) => {
+    setStudentDraft({
+      name: registeredTrial.name,
+      phone: registeredTrial.phone,
+      gender: registeredTrial.gender || "남",
+      category: getCategoryFromGrade(registeredTrial.grade),
+      status: "재원",
+    })
+    setIsStudentAddOpen(true)
+  }, [getCategoryFromGrade])
+
   const handleDelete = useCallback(async (id: string) => {
     setTrials((prev) => prev.filter((t) => t.id !== id))
     await deleteTrialApi(id)
@@ -95,6 +121,17 @@ export default function TrialsClient({
       await updateTrialApi({ ...trial, note })
     }
   }, [trials])
+
+  const handleStudentSaved = useCallback(async (formData: StudentFormData, schedules: StudentSchedule[]) => {
+    await createStudentApi(formData, schedules)
+    setIsStudentAddOpen(false)
+    setStudentDraft(null)
+  }, [])
+
+  const handleStudentModalClose = useCallback(() => {
+    setIsStudentAddOpen(false)
+    setStudentDraft(null)
+  }, [])
 
   return (
     <>
@@ -172,6 +209,14 @@ export default function TrialsClient({
         reservation={selectedReservation}
         onUpdate={handleUpdate}
         onDelete={handleDelete}
+        onRegistered={handleRegistered}
+      />
+
+      <AddStudentModal
+        isOpen={isStudentAddOpen}
+        onClose={handleStudentModalClose}
+        onSaved={handleStudentSaved}
+        initialData={studentDraft ?? undefined}
       />
     </>
   )

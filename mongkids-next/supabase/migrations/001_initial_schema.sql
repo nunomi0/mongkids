@@ -165,6 +165,11 @@ CREATE TABLE level_test_configs (
 );
 
 -- ============================================================
+-- 시드 데이터: branches
+-- ============================================================
+INSERT INTO branches (id, name) VALUES
+  ('b0000000-0000-0000-0000-000000000001', '몽키즈클라이밍 고양화정점');
+
 -- 시드 데이터: level_test_configs
 -- ============================================================
 INSERT INTO level_test_configs (level, required_months) VALUES

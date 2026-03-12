@@ -36,9 +36,17 @@ type Props = {
   reservation: TrialReservation | null
   onUpdate: (updated: TrialReservation) => void
   onDelete: (id: string) => void
+  onRegistered?: (updated: TrialReservation) => void
 }
 
-export default function TrialDetailModal({ isOpen, onClose, reservation, onUpdate, onDelete }: Props) {
+export default function TrialDetailModal({
+  isOpen,
+  onClose,
+  reservation,
+  onUpdate,
+  onDelete,
+  onRegistered,
+}: Props) {
   const [isEditMode, setIsEditMode] = useState(false)
   const [editForm, setEditForm] = useState({
     name: "",
@@ -65,12 +73,17 @@ export default function TrialDetailModal({ isOpen, onClose, reservation, onUpdat
 
   const handleSave = useCallback(() => {
     if (!reservation) return
-    onUpdate({
+    const updatedReservation = {
       ...reservation,
       ...editForm,
-    })
+    }
+    onUpdate(updatedReservation)
+    if (reservation.status !== "등록" && editForm.status === "등록") {
+      onRegistered?.(updatedReservation)
+      onClose()
+    }
     setIsEditMode(false)
-  }, [reservation, editForm, onUpdate])
+  }, [reservation, editForm, onUpdate, onRegistered, onClose])
 
   const handleCancel = useCallback(() => {
     if (!reservation) return

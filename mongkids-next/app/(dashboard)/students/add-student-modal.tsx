@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -71,22 +71,32 @@ type Props = {
   isOpen: boolean
   onClose: () => void
   onSaved: (data: StudentFormData, schedules: StudentSchedule[]) => void
+  initialData?: Partial<StudentFormData>
 }
 
 export default function AddStudentModal({
   isOpen,
   onClose,
   onSaved,
+  initialData,
 }: Props) {
   const [formData, setFormData] = useState<StudentFormData>(initialFormData)
   const [schedules, setSchedules] = useState<StudentSchedule[]>([])
   const [errors, setErrors] = useState<FormErrors>({})
 
   const resetForm = useCallback(() => {
-    setFormData(initialFormData)
+    setFormData({
+      ...initialFormData,
+      ...initialData,
+    })
     setSchedules([])
     setErrors({})
-  }, [])
+  }, [initialData])
+
+  useEffect(() => {
+    if (!isOpen) return
+    resetForm()
+  }, [isOpen, resetForm])
 
   const handleClose = useCallback(() => {
     resetForm()
