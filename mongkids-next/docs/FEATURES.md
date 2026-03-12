@@ -1,45 +1,87 @@
-# 몽키즈 클라이밍 관리 시스템 - 구현 기능 목록
+# 몽키즈 클라이밍 관리 시스템 기능 및 구현 문서
+
+이 문서는 개발자용 문서입니다.
+
+- 목적: 현재 구현된 화면, 기능, 기술 구조를 정리
+- 대상 독자: 개발자, 리뷰어, 테스트 담당자
+- 성격: "정책"이 아니라 "현재 어떻게 만들어져 있는가"를 설명하는 문서
+
+학원 운영 기준은 [OPERATIONS_POLICY.md](/Users/leeyukyung/ReactProject/mongkids/mongkids-next/docs/OPERATIONS_POLICY.md)를 따릅니다.
 
 ## 프로젝트 개요
-클라이밍 학원(몽키즈클라이밍 고양화정점) 관리를 위한 싱글 유저 어드민 툴.
-Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS + shadcn/ui 기반.
+클라이밍 학원(몽키즈클라이밍 고양화정점) 관리를 위한 싱글 유저 어드민 툴입니다.
+Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS + shadcn/ui 기반입니다.
 
 ---
 
-## 1. 공통 인프라
+## 1. 메인 대시보드 (`/`)
 
-### 1.1 라우팅 및 레이아웃
+### 1.1 요약 카드 (상단 4개)
+- 전체 학생 현황 (재원/휴원/퇴원/체험 카운트)
+- 오늘 출석 현황 (출석/결석/예정 카운트)
+- 오늘 수업 수 (시간대별 수업 개수)
+- 이번 달 미결제 학생 수
+
+### 1.2 레벨 테스트 대상자 (좌측)
+- `level_test_configs` 기반 테스트 시기가 된 학생 자동 계산
+- 테이블: 이름, 학년, 현재 레벨 → 다음 레벨, 경과/필요 개월
+- 기한 초과 시 강조 표시
+
+### 1.3 미처리 보강 (좌측)
+- 결석 후 보강 미완료 학생 목록 (최근 3개월)
+- 학생별 미보강 건수 + 결석 날짜/시간 표시
+
+### 1.4 오늘의 체험 (우측)
+- 오늘 예약된 체험자 목록 + 상태 뱃지
+
+### 1.5 미결제 학생 (우측)
+- 재원 학생 중 해당 월 결제 내역 없는 학생 목록
+- 등록반, 전화번호 표시
+
+### 1.6 학생 분포 (우측)
+- 카테고리별 (어린이/청소년/성인/스페셜) 분포
+- 레벨별 (WHITE~GOLD) 분포, 컬러 뱃지
+
+### 1.7 최근 변동 (우측)
+- 30일 내 신규 등록 학생 + 레벨 승급 학생
+- 타임라인 형태, 상대 날짜 표시
+
+---
+
+## 2. 공통 인프라
+
+### 2.1 라우팅 및 레이아웃
 - App Router 기반 `(dashboard)` 라우트 그룹
 - 사이드바 네비게이션 (메인, 수업 관리, 학생 관리, 체험 관리)
 - 대시보드 헤더
 
-### 1.2 공통 컴포넌트
+### 2.2 공통 컴포넌트
 - `LevelBadge` — 레벨별 색상 뱃지 (WHITE~GOLD)
 - `StatusBadge` — 학생 상태 뱃지 (재원/휴원/퇴원/체험)
 - `TrialStatusBadge` — 체험 상태 뱃지 (예정/노쇼/미등록/등록)
 - shadcn/ui 프리미티브 (Dialog, Table, Select, Input, Button, Card 등)
 
-### 1.3 타입 시스템
+### 2.3 타입 시스템
 - `types/student.ts` — 모든 도메인 타입 정의
 - Student, Payment, LevelHistory, ClassItem, TrialReservation 등
 
 ---
 
-## 2. 학생 관리 (`/students`)
+## 3. 학생 관리 (`/students`)
 
-### 2.1 학생 목록
+### 3.1 학생 목록
 - 테이블 뷰: 이름, 성별, 학년, 레벨, 등록반, 수업시간, 전화번호, 최근결제, 결제금액, 상태
 - 이름/전화번호 검색
 - 상태 필터 (전체/재원/휴원/퇴원/체험)
 
-### 2.2 학생 등록 (모달)
+### 3.2 학생 등록 (모달)
 - 기본 정보: 이름, 생년월일, 성별, 전화번호, 상태, 신발사이즈
 - 등록반 선택 (어린이 주2/3회, 성인 주2/3회, 체험)
 - 수업 시간 스케줄 관리 (요일/시간/그룹타입, 동적 추가/삭제)
 - 등록반별 주당 수업 횟수 검증
 - 중복 시간 검증
 
-### 2.3 학생 상세 (모달)
+### 3.3 학생 상세 (모달)
 - **프로필 탭**: 기본 정보 조회
 - **출석 탭**: 월별 출석 캘린더, 출석 통계, 출석 상태 시각화
 - **결제 탭**: 결제 내역 목록, 결제 추가/수정/삭제, 할인 관리
@@ -49,9 +91,9 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS + shadcn/ui 기�
 
 ---
 
-## 3. 수업 관리 (`/classes`)
+## 4. 수업 관리 (`/classes`)
 
-### 3.1 일별 수업 (`/classes/daily`)
+### 4.1 일별 수업 (`/classes/daily`)
 - 날짜 네비게이션 (이전/다음/오늘)
 - 시간대별 그룹 렌더링 (15:00, 16:00, 17:00)
 - 수업 카드: 그룹타입, 학생 목록, 출석 통계
@@ -60,7 +102,7 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS + shadcn/ui 기�
 - 학생 추가 (정규/보강 선택, 보강 시 원래 수업 선택)
 - 학생 클릭 시 상세 모달 연결
 
-### 3.2 주차별 수업 (`/classes/weekly`)
+### 4.2 주차별 수업 (`/classes/weekly`)
 - 주간 타임테이블 (월~일, 시간대별 그리드)
 - 주 네비게이션 (이전/다음/이번주)
 - 미니 달력으로 주 선택
@@ -69,25 +111,25 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS + shadcn/ui 기�
 - **그룹 타입 중복 방지**: 같은 시간대에 이미 존재하는 그룹 타입은 선택 불가
 - 학생 추가/출석 관리
 
-### 3.3 학생 추가 모달
+### 4.3 학생 추가 모달
 - 일반 수업: 학생 검색 → 정규/보강 선택 → (보강 시) 원래 수업 선택
 - 학생 검색 시 상세 정보 표시: 이름, 성별, 학년, 레벨, 등록반, 수업시간, 전화번호, 상태
 - 체험 수업: 체험 학생 간편 등록 (이름, 전화번호, 학년, 성별)
 
 ---
 
-## 4. 체험 관리 (`/trials`)
+## 5. 체험 관리 (`/trials`)
 
-### 4.1 체험 예약 목록
+### 5.1 체험 예약 목록
 - 테이블 뷰: 이름, 성별, 학년, 전화번호, 예약일, 수업시간, 상태
 - 이름/전화번호/학년 검색
 - 상태 필터 (전체/예정/노쇼/미등록/등록)
 - 통계 카드 (전체/예정/노쇼/미등록/등록 건수)
 
-### 4.2 체험 예약 등록 (모달)
+### 5.2 체험 예약 등록 (모달)
 - 이름, 전화번호, 성별, 학년, 체험 날짜, 수업 시간
 
-### 4.3 체험자 상세 (모달)
+### 5.3 체험자 상세 (모달)
 - 체험자 정보 조회/편집
 - 상태 변경 (예정/노쇼/미등록/등록)
 - 메모 관리
@@ -95,27 +137,27 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS + shadcn/ui 기�
 
 ---
 
-## 5. 성능 최적화
+## 6. 성능 최적화
 - `React.memo` 적용 (StudentsTable, ClassDetailCard, TimeSlotSection 등)
 - `useCallback`, `useMemo` 활용
 - 수업 시간 드롭다운 flex-1 균등 분배 (학생 추가/수정 모달)
 
 ---
 
-## 6. 데이터베이스 (Supabase)
+## 7. 데이터베이스 (Supabase)
 
-### 6.1 스키마 설계
+### 7.1 스키마 설계
 - 9개 테이블: branches, students, student_schedules, student_levels, payments, classes, attendance, trial_reservations, level_test_configs
 - 멀티 지점 지원 (단일 DB + branch_id, 약 24개 지점)
 - `supabase/migrations/001_initial_schema.sql`
 
-### 6.2 핵심 설계
+### 7.2 핵심 설계
 - 보강 추적: attendance.status 5단계 (예정→출석/결석→보강예정→보강완료) + self-referencing FK
 - 레벨 테스트: student_levels.acquired_date (null=미취득, 날짜=합격일)
 - 결제 할인: payments.discounts JSONB 배열
 - updated_at 자동 갱신 트리거 (students, payments)
 
-### 6.3 Supabase 연동 현황 (전체 완료)
+### 7.3 Supabase 연동 현황 (전체 완료)
 - `lib/supabase.ts` — Supabase 클라이언트
 - `lib/queries.ts` — 모든 CRUD 쿼리 함수 (학생/결제/출석/수업/체험)
 - `lib/utils/student.ts` — 학년 계산, 반 이름 포맷 등 유틸
@@ -127,7 +169,41 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS + shadcn/ui 기�
 
 ---
 
-## 7. 미구현 / 예정 기능
+## 8. 데이터 관리 (`/settings`)
+
+### 8.1 등록회원명단 업로드/다운로드
+- 엑셀 파일(`.xlsx`) 업로드 → 학생/결제/스케줄 데이터 Supabase upsert
+- 파싱: 월별 시트 순서대로 처리, 이름+생년월일로 중복 판별
+- 신규 학생 생성 + 기존 학생 갱신 (최신 월 데이터 우선)
+- 결제 데이터 자동 생성 (시트 월 → target_month)
+- 수업시간 파싱 (화17 → weekday=2, time=17:00)
+- 등급 매핑 (화이트→WHITE, 마스터→GOLD 등)
+- 다운로드: 재원 학생 전체 데이터를 원본 형식 엑셀로 내보내기
+
+### 8.2 출석표 업로드/다운로드
+- 요일별 시트 파싱 (월요일~일요일)
+- 날짜 컬럼 매핑: Row 2(월 헤더) + Row 3(날짜 숫자) → 실제 날짜 계산
+- 셀 배경색 기반 출석/결석 판별 (노란색=출석, 회색=결석)
+- 특수 셀 처리: 레벨테스트(Y/G/B/R/W/K), 보강(날짜/학생이름), 시작일
+- 수업(classes) + 출석(attendance) 테이블 upsert
+- 다운로드: 연도/월 범위 선택 → 요일별 시트 + 출석 셀 색상 스타일 적용
+
+### 8.3 사이드바
+- "데이터 관리" 메뉴 항목 추가 (데이터베이스 아이콘)
+
+### 8.4 기술 스택
+- `exceljs` — 셀 배경색 읽기/쓰기 지원
+- `file-saver` — 클라이언트 사이드 파일 다운로드
+- `lib/excel/` 모듈: utils, member-parser, member-generator, attendance-parser, attendance-generator
+
+---
+
+## 9. 미구현 / 예정 기능
 - 인증/로그인
-- 메인 대시보드 콘텐츠
 - 체험 학생 등록 시 students 테이블 연동
+
+## 10. 문서 사용 원칙
+
+- 운영 정책을 확인할 때는 [OPERATIONS_POLICY.md](/Users/leeyukyung/ReactProject/mongkids/mongkids-next/docs/OPERATIONS_POLICY.md)를 먼저 봅니다.
+- 화면 구성, API, 데이터 구조, 구현 범위는 이 문서를 기준으로 봅니다.
+- 정책과 구현이 다르면 이 문서에 현재 상태를 적고, 구현을 정책에 맞추는 방향으로 수정합니다.

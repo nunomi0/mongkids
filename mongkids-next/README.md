@@ -1,200 +1,87 @@
-# Mongkids 학원 관리 시스템
+# 몽키즈 클라이밍 관리 시스템
 
-몽키즈 클라이밍 학원 관리 시스템입니다.
+몽키즈클라이밍 고양화정점 운영을 위한 어드민 웹 프로젝트입니다.
+
+기존에 엑셀로 나뉘어 관리하던 학생, 출결, 결제, 보강, 체험 데이터를 한 화면에서 다루는 것을 목표로 합니다. 수업 사이 짧은 시간 안에 필요한 정보를 확인하고 처리할 수 있도록 만드는 것이 핵심입니다.
+
+## 문서 안내
+
+- 학원 운영 기준: [OPERATIONS_POLICY.md](/Users/leeyukyung/ReactProject/mongkids/mongkids-next/docs/OPERATIONS_POLICY.md)
+- 현재 구현 기능과 개발 구조: [FEATURES.md](/Users/leeyukyung/ReactProject/mongkids/mongkids-next/docs/FEATURES.md)
+- 수동 검증 체크리스트: [QA-SIMULATION.md](/Users/leeyukyung/ReactProject/mongkids/mongkids-next/docs/QA-SIMULATION.md)
+- 개발 이력: [DEVLOG.md](/Users/leeyukyung/ReactProject/mongkids/mongkids-next/docs/DEVLOG.md)
+
+## 현재 범위
+
+현재 프로젝트는 아래 흐름을 중심으로 구성되어 있습니다.
+
+- 대시보드
+- 학생 관리
+- 수업 관리
+- 체험 관리
+- 데이터 관리
+
+세부 구현 범위는 [FEATURES.md](/Users/leeyukyung/ReactProject/mongkids/mongkids-next/docs/FEATURES.md)를 기준으로 봅니다.
 
 ## 기술 스택
 
-- **Framework**: Next.js 16
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **UI Components**: Radix UI + shadcn/ui
-- **Database**: Supabase (예정)
+- Next.js 16
+- React 19
+- TypeScript
+- Tailwind CSS
+- shadcn/ui
+- Supabase
+- ExcelJS
 
-## 시작하기
+## 실행 방법
+
+### 1. 의존성 설치
 
 ```bash
 npm install
+```
+
+### 2. 환경 변수 준비
+
+`.env.local`에 최소한 아래 값이 필요합니다.
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+```
+
+### 3. 개발 서버 실행
+
+```bash
 npm run dev
 ```
 
-[http://localhost:3000](http://localhost:3000)에서 확인할 수 있습니다.
+브라우저에서 [http://localhost:3000](http://localhost:3000)을 열면 됩니다.
 
----
+## 데이터 준비
 
-## 기능 명세
+Supabase 스키마는 [001_initial_schema.sql](/Users/leeyukyung/ReactProject/mongkids/mongkids-next/supabase/migrations/001_initial_schema.sql)에 있습니다.
 
-### 학생 관리
+시뮬레이션용 데이터가 필요하면 아래 스크립트를 사용할 수 있습니다.
 
-#### 학생 목록 (`/students`)
-- 학생 목록 테이블 표시
-- 이름/전화번호 검색
-- 학생 클릭 시 상세 모달 열림
-
-#### 학생 등록
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| 이름 | string | O | 학생 이름 |
-| 생년월일 | date | O | YYYY-MM-DD |
-| 성별 | enum | - | 남 / 여 |
-| 전화번호 | string | O | 010-0000-0000 |
-| 상태 | enum | - | 재원 / 휴원 / 퇴원 / 체험 |
-| 신발 사이즈 | string | - | 숫자 (예: 250) |
-| 등록반 | select | O | 등록반 선택 |
-| 수업 시간 | array | - | 요일, 시간, 그룹 타입 |
-
-**유효성 검사:**
-- 필수 필드 입력 확인
-- 수업 시간 중복 검사
-- 등록반의 주 n회와 수업 시간 개수 일치 검사
-
-#### 학생 정보 수정
-- 학생 상세 모달에서 "정보 수정" 버튼 클릭
-- 등록과 동일한 폼 (기존 데이터 로드)
-- 수업 시간 추가/삭제 가능
-
-### 결제 관리
-
-#### 결제 추가
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| 결제일 | date | O | 결제 날짜 |
-| 해당월 | month | O | 수업료 해당 월 |
-| 금액 | number | O | 결제 금액 |
-| 결제수단 | enum | O | 계좌이체 / 카드결제 / 스포츠바우처 / 현금 |
-| 할인 | array | - | 할인 유형 + 금액 (동적 추가) |
-| 메모 | string | - | 메모 |
-
-**할인 유형:**
-- 신발
-- 형제자매
-- 추가
-- 이벤트
-- 기타
-
-**기능:**
-- 할인 동적 추가/삭제
-- 최종 금액 실시간 계산
-
-#### 결제 수정
-- 결제 내역 테이블에서 더보기(⋯) 버튼 → "수정" 클릭
-- 기존 결제 데이터 로드
-- 할인 추가/삭제 가능
-
-#### 결제 삭제
-- 결제 내역 테이블에서 더보기(⋯) 버튼 → "삭제" 클릭
-- 삭제 확인 다이얼로그 표시
-- 확인 시 삭제 실행
-
-### 레벨 관리
-
-#### 레벨 이력 수정
-- 레벨 섹션 상단 연필 아이콘 클릭
-- 각 레벨별 취득일 입력/수정
-- X 버튼으로 취득일 초기화 (미취득 처리)
-
-**레벨 종류:**
-- WHITE → YELLOW → GREEN → BLUE → RED → BLACK → GOLD
-
----
-
-## 타입 정의
-
-```typescript
-// types/student.ts
-
-type StudentStatus = '재원' | '휴원' | '퇴원' | '체험'
-type GroupType = '일반1' | '일반2' | '스페셜' | '체험'
-type Gender = '남' | '여'
-type PaymentMethod = '계좌이체' | '카드결제' | '스포츠바우처' | '현금'
-type LevelType = 'WHITE' | 'YELLOW' | 'GREEN' | 'BLUE' | 'RED' | 'BLACK' | 'GOLD'
-
-type StudentSchedule = {
-  weekday: number      // 0-6 (일-토)
-  time: string         // "HH:mm"
-  group_type: GroupType
-}
-
-type ClassType = {
-  id: number
-  category: string
-  sessions_per_week: number
-}
-
-type Student = {
-  id: number
-  name: string
-  birth_date: string
-  phone: string
-  class_type_id: number
-  gender: Gender
-  status: StudentStatus
-  shoe_size: string
-  memo: string
-  schedules: StudentSchedule[]
-}
-
-type Discount = {
-  type: string
-  amount: number
-}
-
-type Payment = {
-  id: number
-  student_id: number
-  payment_date: string
-  target_month: string
-  amount: number
-  method: PaymentMethod
-  discounts: Discount[]
-  memo: string
-}
-
-type LevelHistory = {
-  level: LevelType
-  acquired_at: string | null
-}
+```bash
+npm run seed
 ```
 
----
+시드 검증 흐름은 [QA-SIMULATION.md](/Users/leeyukyung/ReactProject/mongkids/mongkids-next/docs/QA-SIMULATION.md)를 참고하면 됩니다.
 
-## 프로젝트 구조
+## 라우트 구조
 
-```
-app/
-├── (dashboard)/
-│   └── students/
-│       ├── page.tsx                    # 학생 목록 페이지
-│       ├── students-client.tsx         # 클라이언트 컴포넌트
-│       ├── students-table.tsx          # 테이블 컴포넌트
-│       ├── add-student-modal.tsx       # 학생 등록 모달
-│       └── detail/
-│           ├── index.tsx               # 학생 상세 모달
-│           ├── edit-student-modal.tsx  # 학생 수정 모달
-│           ├── add-payment-modal.tsx   # 결제 추가 모달
-│           ├── edit-payment-modal.tsx  # 결제 수정 모달
-│           ├── edit-level-modal.tsx    # 레벨 이력 수정 모달
-│           └── sections/
-│               ├── profile.tsx         # 기본 정보 섹션
-│               ├── level.tsx           # 레벨 섹션
-│               ├── attendance.tsx      # 출석 섹션
-│               └── payments.tsx        # 결제 내역 섹션
+주요 화면은 모두 [app/(dashboard)](/Users/leeyukyung/ReactProject/mongkids/mongkids-next/app/(dashboard)) 아래에 있습니다. 이 폴더는 URL 경로가 아니라 대시보드 공통 레이아웃을 묶는 용도입니다.
 
-components/
-├── ui/                                 # shadcn/ui 컴포넌트
-│   ├── confirm-dialog.tsx              # 삭제 확인 다이얼로그
-│   └── ...
-└── level-badge.tsx                     # 레벨 색상 배지
+- `/` : 메인 대시보드
+- `/students` : 학생 관리
+- `/classes/daily`, `/classes/weekly` : 수업 관리
+- `/trials` : 체험 관리
+- `/settings` : 데이터 관리
 
-types/
-└── student.ts                          # 학생 관련 타입 정의
-```
+## 현재 확인할 점
 
----
-
-## TODO
-
-- [ ] Supabase 연동
-- [ ] 학생 데이터 CRUD API
-- [ ] 결제 데이터 CRUD API
-- [ ] 출석 관리 기능
-- [ ] 대시보드 통계
+- 운영 정책은 [OPERATIONS_POLICY.md](/Users/leeyukyung/ReactProject/mongkids/mongkids-next/docs/OPERATIONS_POLICY.md)를 우선합니다.
+- 구현 현황은 [FEATURES.md](/Users/leeyukyung/ReactProject/mongkids/mongkids-next/docs/FEATURES.md)에 따로 정리합니다.
+- 문서와 구현이 다르면 정책을 먼저 확인하고 맞추는 방식으로 정리합니다.
