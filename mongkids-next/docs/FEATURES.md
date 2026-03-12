@@ -87,6 +87,7 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS + shadcn/ui 기�
 - **결제 탭**: 결제 내역 목록, 결제 추가/수정/삭제, 할인 관리
 - **레벨 탭**: 레벨 이력 타임라인, 레벨 수정 기능
 - 학생 정보 수정 모달
+- 시간표 수정 시 미래 `예정` 출석만 새 시간표 기준으로 재조정
 - 상태 변경 (재원↔휴원↔퇴원)
 
 ---
@@ -153,13 +154,14 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS + shadcn/ui 기�
 
 ### 7.2 핵심 설계
 - 보강 추적: attendance.status 5단계 (예정→출석/결석→보강예정→보강완료) + self-referencing FK
-- 레벨 테스트: student_levels.acquired_date (null=미취득, 날짜=합격일)
+- 현재 레벨: student_levels.acquired_date 중 가장 최근 취득일 기준
 - 결제 할인: payments.discounts JSONB 배열
 - updated_at 자동 갱신 트리거 (students, payments)
 
 ### 7.3 Supabase 연동 현황 (전체 완료)
 - `lib/supabase.ts` — Supabase 클라이언트
-- `lib/queries.ts` — 모든 CRUD 쿼리 함수 (학생/결제/출석/수업/체험)
+- `lib/queries/` — 학생, 결제, 레벨, 수업, 체험, 대시보드, 엑셀 단위 쿼리 모듈
+- `lib/queries.ts` — `lib/queries/` 재노출 진입점
 - `lib/utils/student.ts` — 학년 계산, 반 이름 포맷 등 유틸
 - **학생 관리**: 목록 조회, 상세 조회, 등록, 수정, 상태 변경, 결제/출석/레벨 CRUD
 - **일별 수업**: 수업 목록 + 출석 조회, 출석 토글, 전체 출석, 메모 수정
@@ -176,6 +178,8 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS + shadcn/ui 기�
 - 파싱: 월별 시트 순서대로 처리, 이름+생년월일로 중복 판별
 - 신규 학생 생성 + 기존 학생 갱신 (최신 월 데이터 우선)
 - 결제 데이터 자동 생성 (시트 월 → target_month)
+- 같은 `target_month` 결제 여러 건 허용
+- 엑셀 재업로드 시 동일 결제일·월·금액·메모·할인 조합은 중복 생성하지 않음
 - 수업시간 파싱 (화17 → weekday=2, time=17:00)
 - 등급 매핑 (화이트→WHITE, 마스터→GOLD 등)
 - 다운로드: 재원 학생 전체 데이터를 원본 형식 엑셀로 내보내기
@@ -200,7 +204,7 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS + shadcn/ui 기�
 
 ## 9. 미구현 / 예정 기능
 - 인증/로그인
-- 체험 학생 등록 시 students 테이블 연동
+- 체험 예약과 생성 학생의 영구 연결(student_id 저장)
 
 ## 10. 문서 사용 원칙
 

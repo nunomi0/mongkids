@@ -13,6 +13,175 @@ import {
   supabase,
 } from "./shared"
 
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function getWeekdayFromDate(date: string): number {
+  return new Date(`${date}T00:00:00`).getDay()
+}
+
+function getDateRange(startDate: string, endDate: string): string[] {
+  const dates: string[] = []
+  const cursor = new Date(`${startDate}T00:00:00`)
+  const end = new Date(`${endDate}T00:00:00`)
+
+  while (cursor <= end) {
+    dates.push(formatLocalDate(cursor))
+    cursor.setDate(cursor.getDate() + 1)
+  }
+
+  return dates
+}
+
+async function syncPlannedAttendances(
+  studentId: string,
+  nextStatus: string | undefined,
+  schedules: StudentSchedule[]
+): Promise<void> {
+  const today = formatLocalDate(new Date())
+
+  const { data: futureAttendances, error: futureAttendanceError } = await supabase
+    .from("attendance")
+    .select(`
+      id, class_id, status,
+      classes!inner (date, time, group_type)
+    `)
+    .eq("student_id", studentId)
+    .gte("classes.date", today)
+
+  if (futureAttendanceError) {
+    console.error("syncPlannedAttendances future attendance error:", futureAttendanceError)
+    return
+  }
+
+  const plannedAttendanceIds: string[] = []
+  const lockedClassIds = new Set<string>()
+
+  for (const attendance of futureAttendances || []) {
+    if (attendance.status === "예정") {
+      plannedAttendanceIds.push(attendance.id)
+    } else {
+      lockedClassIds.add(attendance.class_id)
+    }
+  }
+
+  if (plannedAttendanceIds.length > 0) {
+    const { error: deleteAttendanceError } = await supabase
+      .from("attendance")
+      .delete()
+      .in("id", plannedAttendanceIds)
+
+    if (deleteAttendanceError) {
+      console.error("syncPlannedAttendances delete error:", deleteAttendanceError)
+      return
+    }
+  }
+
+  if (nextStatus !== "재원" || schedules.length === 0) return
+
+  const { data: futureClasses, error: futureClassError } = await supabase
+    .from("classes")
+    .select("id, date, time, group_type")
+    .eq("branch_id", DEFAULT_BRANCH_ID)
+    .gte("date", today)
+    .order("date")
+    .order("time")
+
+  if (futureClassError) {
+    console.error("syncPlannedAttendances future class error:", futureClassError)
+    return
+  }
+
+  if (!futureClasses || futureClasses.length === 0) return
+
+  const maxDate = futureClasses[futureClasses.length - 1].date
+  const dates = getDateRange(today, maxDate)
+  const classKeyToId = new Map<string, string>()
+
+  for (const cls of futureClasses) {
+    classKeyToId.set(`${cls.date}|${cls.time}|${cls.group_type}`, cls.id)
+  }
+
+  const missingClassRows: { branch_id: string; date: string; time: string; group_type: string }[] = []
+  for (const date of dates) {
+    const weekday = getWeekdayFromDate(date)
+    for (const schedule of schedules) {
+      if (schedule.weekday !== weekday) continue
+      const key = `${date}|${schedule.time}|${schedule.group_type}`
+      if (!classKeyToId.has(key)) {
+        missingClassRows.push({
+          branch_id: DEFAULT_BRANCH_ID,
+          date,
+          time: schedule.time,
+          group_type: schedule.group_type,
+        })
+      }
+    }
+  }
+
+  if (missingClassRows.length > 0) {
+    const { error: createClassError } = await supabase
+      .from("classes")
+      .upsert(missingClassRows, { onConflict: "branch_id,date,time,group_type", ignoreDuplicates: true })
+
+    if (createClassError) {
+      console.error("syncPlannedAttendances create class error:", createClassError)
+      return
+    }
+  }
+
+  const { data: syncedFutureClasses, error: syncedFutureClassError } = await supabase
+    .from("classes")
+    .select("id, date, time, group_type")
+    .eq("branch_id", DEFAULT_BRANCH_ID)
+    .gte("date", today)
+    .lte("date", maxDate)
+
+  if (syncedFutureClassError) {
+    console.error("syncPlannedAttendances refetch class error:", syncedFutureClassError)
+    return
+  }
+
+  const attendanceRows: { student_id: string; class_id: string; status: "예정" }[] = []
+  for (const cls of syncedFutureClasses || []) {
+    if (lockedClassIds.has(cls.id)) continue
+    const weekday = getWeekdayFromDate(cls.date)
+    const isScheduledClass = schedules.some(
+      (schedule) =>
+        schedule.weekday === weekday &&
+        schedule.time === cls.time &&
+        schedule.group_type === cls.group_type
+    )
+
+    if (isScheduledClass) {
+      attendanceRows.push({
+        student_id: studentId,
+        class_id: cls.id,
+        status: "예정",
+      })
+    }
+  }
+
+  if (attendanceRows.length === 0) return
+
+  const batchSize = 500
+  for (let i = 0; i < attendanceRows.length; i += batchSize) {
+    const batch = attendanceRows.slice(i, i + batchSize)
+    const { error: upsertAttendanceError } = await supabase
+      .from("attendance")
+      .upsert(batch, { onConflict: "student_id,class_id", ignoreDuplicates: true })
+
+    if (upsertAttendanceError) {
+      console.error("syncPlannedAttendances upsert error:", upsertAttendanceError)
+      return
+    }
+  }
+}
+
 export async function fetchStudentsList(): Promise<StudentListItem[]> {
   const { data: students, error } = await supabase
     .from("students")
@@ -146,6 +315,8 @@ export async function updateStudent(
   formData: Partial<Student>,
   schedules?: StudentSchedule[]
 ): Promise<void> {
+  let nextStatus = formData.status
+
   const { error } = await supabase
     .from("students")
     .update({
@@ -167,17 +338,50 @@ export async function updateStudent(
   }
 
   if (schedules) {
-    await supabase.from("student_schedules").delete().eq("student_id", id)
+    if (!nextStatus) {
+      const { data: currentStudent, error: currentStudentError } = await supabase
+        .from("students")
+        .select("status")
+        .eq("id", id)
+        .single()
+
+      if (currentStudentError) {
+        console.error("updateStudent status fetch error:", currentStudentError)
+        return
+      }
+
+      nextStatus = currentStudent.status
+    }
+
+    const { error: deleteScheduleError } = await supabase
+      .from("student_schedules")
+      .delete()
+      .eq("student_id", id)
+
+    if (deleteScheduleError) {
+      console.error("updateStudent schedules delete error:", deleteScheduleError)
+      return
+    }
+
     if (schedules.length > 0) {
-      await supabase.from("student_schedules").insert(
+      const { error: insertScheduleError } = await supabase
+        .from("student_schedules")
+        .insert(
         schedules.map((s) => ({
           student_id: id,
           weekday: s.weekday,
           time: s.time,
           group_type: s.group_type,
         }))
-      )
+        )
+
+      if (insertScheduleError) {
+        console.error("updateStudent schedules insert error:", insertScheduleError)
+        return
+      }
     }
+
+    await syncPlannedAttendances(id, nextStatus, schedules)
   }
 }
 

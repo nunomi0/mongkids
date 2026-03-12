@@ -22,13 +22,14 @@ export async function saveLevelHistories(
   studentId: string,
   histories: LevelHistory[]
 ): Promise<void> {
-  const levels: LevelType[] = ["WHITE", "YELLOW", "GREEN", "BLUE", "RED", "BLACK", "GOLD"]
   let currentLevel: LevelType | null = null
-  for (let i = levels.length - 1; i >= 0; i--) {
-    const h = histories.find((history) => history.level === levels[i])
-    if (h?.acquired_at) {
-      currentLevel = levels[i]
-      break
+  let latestAcquiredAt = ""
+
+  for (const history of histories) {
+    if (!history.acquired_at) continue
+    if (history.acquired_at >= latestAcquiredAt) {
+      latestAcquiredAt = history.acquired_at
+      currentLevel = history.level
     }
   }
 

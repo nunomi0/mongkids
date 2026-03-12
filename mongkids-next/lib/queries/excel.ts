@@ -146,12 +146,19 @@ export async function upsertStudentsFromExcel(
     try {
       const { data: existingPayments } = await supabase
         .from("payments")
-        .select("id")
+        .select("id, discounts, memo")
         .eq("student_id", studentId)
         .eq("target_month", payment.target_month)
-        .limit(1)
+        .eq("payment_date", payment.payment_date)
+        .eq("amount", payment.amount)
+        .eq("memo", payment.memo)
 
-      if (existingPayments && existingPayments.length > 0) continue
+      const normalizedDiscounts = JSON.stringify(payment.discounts || [])
+      const hasExactSamePayment = (existingPayments || []).some(
+        (existing: any) => JSON.stringify(existing.discounts || []) === normalizedDiscounts
+      )
+
+      if (hasExactSamePayment) continue
 
       if (payment.amount > 0) {
         const { error } = await supabase.from("payments").insert({
