@@ -69,22 +69,23 @@ export default function StudentsClient({
 
   const handleStudentSaved = useCallback(async (formData: StudentFormData, schedules: StudentSchedule[]) => {
     const created = await createStudentApi(formData, schedules)
-    if (created) {
-      const newListItem: StudentListItem = {
-        id: created.id,
-        name: created.name,
-        gender: created.gender,
-        grade: calculateGrade(created.birth_date),
-        level: created.current_level || '',
-        className: formatClassName(created.category, created.sessions_per_week),
-        classTime: formatClassTime(created.schedules),
-        phone: created.phone,
-        lastPayment: '',
-        paymentAmount: '',
-        status: created.status,
-      }
-      setStudents((prev) => [newListItem, ...prev])
+    if (!created) return false
+
+    const newListItem: StudentListItem = {
+      id: created.id,
+      name: created.name,
+      gender: created.gender,
+      grade: calculateGrade(created.birth_date),
+      level: created.current_level || '',
+      className: formatClassName(created.category, created.sessions_per_week),
+      classTime: formatClassTime(created.schedules),
+      phone: created.phone,
+      lastPayment: '',
+      paymentAmount: '',
+      status: created.status,
     }
+    setStudents((prev) => [newListItem, ...prev])
+    return true
   }, [])
 
   // 학생 상태 변경 핸들러

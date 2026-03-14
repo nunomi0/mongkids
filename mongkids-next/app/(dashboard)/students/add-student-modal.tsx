@@ -70,7 +70,7 @@ const initialFormData: StudentFormData = {
 type Props = {
   isOpen: boolean
   onClose: () => void
-  onSaved: (data: StudentFormData, schedules: StudentSchedule[]) => void
+  onSaved: (data: StudentFormData, schedules: StudentSchedule[]) => boolean | Promise<boolean>
   initialData?: Partial<StudentFormData>
 }
 
@@ -176,10 +176,11 @@ export default function AddStudentModal({
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return
 
-    onSaved(formData, schedules)
+    const saved = await onSaved(formData, schedules)
+    if (!saved) return
     handleClose()
   }
 

@@ -133,6 +133,9 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS + shadcn/ui 기�
 ### 5.3 체험자 상세 (모달)
 - 체험자 정보 조회/편집
 - 상태 변경 (예정/노쇼/미등록/등록)
+- `등록` 변경 시 학생 등록 모달 오픈
+- 학생 등록 완료 시 `trial_reservations.student_id` 저장
+- 학생 등록 모달 취소 시 체험 상태 원복
 - 메모 관리
 - 체험자 삭제
 
@@ -204,7 +207,6 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS + shadcn/ui 기�
 
 ## 9. 미구현 / 예정 기능
 - 인증/로그인
-- 체험 예약과 생성 학생의 영구 연결(student_id 저장)
 
 ## 10. 문서 사용 원칙
 

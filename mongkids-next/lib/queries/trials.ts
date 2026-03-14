@@ -21,6 +21,7 @@ export async function fetchTrials(): Promise<TrialReservation[]> {
     grade: t.grade || "",
     status: t.status,
     class_id: t.class_id,
+    student_id: t.student_id,
     trial_date: t.classes?.date || "",
     trial_time: t.classes?.time || "",
     note: t.note || "",
@@ -63,6 +64,7 @@ export async function createTrial(data: {
     grade: trial.grade || "",
     status: trial.status,
     class_id: trial.class_id,
+    student_id: trial.student_id,
     trial_date: "",
     trial_time: "",
     note: trial.note || "",
@@ -79,11 +81,24 @@ export async function updateTrial(trial: TrialReservation): Promise<void> {
       gender: trial.gender,
       grade: trial.grade,
       status: trial.status,
+      student_id: trial.student_id,
       note: trial.note,
     })
     .eq("id", trial.id)
 
   if (error) console.error("updateTrial error:", error)
+}
+
+export async function linkTrialToStudent(trialId: string, studentId: string): Promise<void> {
+  const { error } = await supabase
+    .from("trial_reservations")
+    .update({
+      status: "등록" as TrialStatus,
+      student_id: studentId,
+    })
+    .eq("id", trialId)
+
+  if (error) console.error("linkTrialToStudent error:", error)
 }
 
 export async function deleteTrial(id: string): Promise<void> {

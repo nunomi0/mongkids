@@ -74,5 +74,6 @@ npm run seed
 - 새 문서와 수정 문서는 한국어로 작성합니다.
 - 조건부 className 병합에는 `@/lib/utils`의 `cn()`을 사용합니다.
 - 화면 흐름은 새 페이지보다 모달 중심 CRUD를 우선합니다.
+- 커밋 메시지는 `feat:`, `fix:`, `refactor:`, `docs:`, `chore:` 형식을 사용합니다.
 - 기능 단위로 커밋을 남깁니다.
 - 작업이 끝나면 `docs/DEVLOG.md`를 갱신합니다.

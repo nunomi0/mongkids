@@ -58,6 +58,7 @@ export async function fetchTodayTrials(date: string): Promise<TrialReservation[]
       grade: t.grade || "",
       status: t.status,
       class_id: t.class_id,
+      student_id: t.student_id,
       trial_date: t.classes?.date || "",
       trial_time: t.classes?.time || "",
       note: t.note || "",

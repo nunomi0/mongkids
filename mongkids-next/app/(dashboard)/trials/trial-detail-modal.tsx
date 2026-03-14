@@ -36,7 +36,7 @@ type Props = {
   reservation: TrialReservation | null
   onUpdate: (updated: TrialReservation) => void
   onDelete: (id: string) => void
-  onRegistered?: (updated: TrialReservation) => void
+  onRegistered?: (previous: TrialReservation, updated: TrialReservation) => void
 }
 
 export default function TrialDetailModal({
@@ -76,10 +76,11 @@ export default function TrialDetailModal({
     const updatedReservation = {
       ...reservation,
       ...editForm,
+      student_id: editForm.status === "등록" ? reservation.student_id : null,
     }
     onUpdate(updatedReservation)
     if (reservation.status !== "등록" && editForm.status === "등록") {
-      onRegistered?.(updatedReservation)
+      onRegistered?.(reservation, updatedReservation)
       onClose()
     }
     setIsEditMode(false)

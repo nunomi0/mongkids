@@ -112,6 +112,7 @@ export type TrialReservation = {
   grade: string
   status: TrialStatus
   class_id: string | null
+  student_id: string | null
   trial_date: string
   trial_time: string
   note: string

@@ -21,6 +21,7 @@ import {
   updateTrial as updateTrialApi,
   deleteTrial as deleteTrialApi,
   createStudent as createStudentApi,
+  linkTrialToStudent as linkTrialToStudentApi,
 } from "@/lib/queries"
 import type { TrialReservation, TrialStatus, StudentFormData, StudentSchedule, CategoryType } from "@/types/student"
 
@@ -46,6 +47,10 @@ export default function TrialsClient({
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isStudentAddOpen, setIsStudentAddOpen] = useState(false)
   const [studentDraft, setStudentDraft] = useState<Partial<StudentFormData> | null>(null)
+  const [pendingRegistration, setPendingRegistration] = useState<{
+    trialId: string
+    previousStatus: TrialStatus
+  } | null>(null)
 
   const getCategoryFromGrade = useCallback((grade: string): CategoryType => {
     if (!grade) return "어린이"
@@ -98,13 +103,17 @@ export default function TrialsClient({
     await updateTrialApi(updated)
   }, [])
 
-  const handleRegistered = useCallback((registeredTrial: TrialReservation) => {
+  const handleRegistered = useCallback((previousTrial: TrialReservation, registeredTrial: TrialReservation) => {
     setStudentDraft({
       name: registeredTrial.name,
       phone: registeredTrial.phone,
       gender: registeredTrial.gender || "남",
       category: getCategoryFromGrade(registeredTrial.grade),
       status: "재원",
+    })
+    setPendingRegistration({
+      trialId: registeredTrial.id,
+      previousStatus: previousTrial.status,
     })
     setIsStudentAddOpen(true)
   }, [getCategoryFromGrade])
@@ -123,15 +132,50 @@ export default function TrialsClient({
   }, [trials])
 
   const handleStudentSaved = useCallback(async (formData: StudentFormData, schedules: StudentSchedule[]) => {
-    await createStudentApi(formData, schedules)
+    const createdStudent = await createStudentApi(formData, schedules)
+    if (!createdStudent) return false
+
+    if (pendingRegistration) {
+      await linkTrialToStudentApi(pendingRegistration.trialId, createdStudent.id)
+      setTrials((prev) =>
+        prev.map((trial) =>
+          trial.id === pendingRegistration.trialId
+            ? { ...trial, status: "등록", student_id: createdStudent.id }
+            : trial
+        )
+      )
+    }
+
     setIsStudentAddOpen(false)
     setStudentDraft(null)
-  }, [])
+    setPendingRegistration(null)
+    return true
+  }, [pendingRegistration])
 
   const handleStudentModalClose = useCallback(() => {
+    if (pendingRegistration) {
+      setTrials((prev) =>
+        prev.map((trial) =>
+          trial.id === pendingRegistration.trialId
+            ? { ...trial, status: pendingRegistration.previousStatus, student_id: null }
+            : trial
+        )
+      )
+
+      const trialToRestore = trials.find((trial) => trial.id === pendingRegistration.trialId)
+      if (trialToRestore) {
+        void updateTrialApi({
+          ...trialToRestore,
+          status: pendingRegistration.previousStatus,
+          student_id: null,
+        })
+      }
+    }
+
     setIsStudentAddOpen(false)
     setStudentDraft(null)
-  }, [])
+    setPendingRegistration(null)
+  }, [pendingRegistration, trials])
 
   return (
     <>
