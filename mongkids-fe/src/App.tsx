@@ -133,10 +133,10 @@ export default function App() {
       </div>
     )
   }
-
+/*
   if (!isAuthenticated) {
     return <LoginScreen onLogin={handleLogin} />
-  }
+  }*/
 
   return (
     <SidebarProvider>
